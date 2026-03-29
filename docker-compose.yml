@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    container_name: imsor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: imsor
+      POSTGRES_PASSWORD: imsor_dev_password
+      POSTGRES_DB: imsor
+    ports:
+      - "5432:5432"
+    volumes:
+      - imsor_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imsor -d imsor"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: ./central-service
+    container_name: imsor-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://imsor:imsor_dev_password@db:5432/imsor
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  imsor_pgdata:
