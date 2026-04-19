@@ -1,8 +1,9 @@
+import json
 import mimetypes
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, send_file, abort
+from flask import Flask, jsonify, request, send_file, abort
 
 import api_client
 
@@ -17,6 +18,11 @@ def index():
 @app.route("/duplicates")
 def duplicates():
     return send_file(Path(__file__).parent / "static" / "duplicates.html")
+
+
+@app.route("/annotations")
+def annotations():
+    return send_file(Path(__file__).parent / "static" / "annotations.html")
 
 
 @app.route("/api/pairs")
@@ -36,6 +42,63 @@ def pairs():
             "image_a": image_a,
             "image_b": image_b,
         })
+    return jsonify(result)
+
+
+@app.route("/api/annotated-images")
+def annotated_images():
+    """Return images that have person_bbox annotations, with their annotations."""
+    all_annotations = api_client.get_all_annotations()
+
+    # Group annotations by image_id, only person_bbox
+    by_image: dict[int, list[dict]] = {}
+    for ann in all_annotations:
+        if ann["annotation_type"] == "person_bbox":
+            by_image.setdefault(ann["image_id"], []).append(ann)
+
+    result = []
+    for image_id, anns in by_image.items():
+        try:
+            image = api_client.get_image(image_id)
+        except Exception:
+            continue
+        result.append({"image": image, "annotations": anns})
+
+    return jsonify(result)
+
+
+@app.route("/api/known-people")
+def known_people():
+    """Return person names ordered by most recently used (newest first)."""
+    all_annotations = api_client.get_all_annotations()
+    # Track the latest created_at per name
+    latest: dict[str, str] = {}
+    for ann in all_annotations:
+        if ann["annotation_type"] == "person_bbox":
+            try:
+                val = json.loads(ann["value"])
+                name = val.get("person_name")
+                if name:
+                    ts = ann.get("created_at", "")
+                    if name not in latest or ts > latest[name]:
+                        latest[name] = ts
+            except (json.JSONDecodeError, TypeError):
+                pass
+    # Sort by timestamp descending (most recent first)
+    names = sorted(latest.keys(), key=lambda n: latest[n], reverse=True)
+    return jsonify(names)
+
+
+@app.route("/api/annotations/<int:annotation_id>", methods=["PATCH"])
+def patch_annotation(annotation_id: int):
+    """Update an annotation's value."""
+    body = request.get_json()
+    if not body or "value" not in body:
+        abort(400)
+    try:
+        result = api_client.update_annotation(annotation_id, body["value"])
+    except Exception:
+        abort(500)
     return jsonify(result)
 
 

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImSor — Annotations</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { margin-bottom: 10px; font-size: 1.4rem; }
+        #controls {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 15px;
+        }
+        #status {
+            margin-bottom: 12px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        #filepath {
+            font-size: 0.8rem;
+            color: #ccc;
+            margin-bottom: 8px;
+            word-break: break-all;
+            text-align: center;
+            max-width: 90vw;
+        }
+        #image-container {
+            position: relative;
+            display: inline-block;
+        }
+        #image-container img {
+            max-width: 90vw;
+            max-height: 70vh;
+            border: 2px solid #333;
+            border-radius: 4px;
+            display: block;
+            background: #111;
+        }
+        .bbox {
+            position: absolute;
+            border: 2px solid #00ff88;
+            background: rgba(0, 255, 136, 0.08);
+            cursor: pointer;
+        }
+        .bbox:hover { background: rgba(0, 255, 136, 0.2); }
+        .bbox.selected { border-color: #ffcc00; background: rgba(255, 204, 0, 0.15); }
+        .bbox.named { border-color: #44aaff; }
+        .bbox-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            background: #00ff88;
+            color: #000;
+            font-size: 0.65rem;
+            padding: 1px 5px;
+            border-radius: 2px;
+            white-space: nowrap;
+        }
+        .bbox.named .bbox-label { background: #44aaff; }
+        .bbox.selected .bbox-label { background: #ffcc00; }
+        button {
+            padding: 10px 24px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #4a4a8a;
+            color: #fff;
+        }
+        button:hover { background: #5a5aaa; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #loading {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-top: 40px;
+        }
+        /* Person assignment panel */
+        #person-panel {
+            margin-top: 14px;
+            padding: 12px 18px;
+            background: #252545;
+            border: 1px solid #444;
+            border-radius: 6px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 280px;
+        }
+        #person-panel .hint {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        #person-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+        }
+        #person-list button {
+            padding: 5px 14px;
+            font-size: 0.85rem;
+            background: #3a3a6a;
+        }
+        #person-list button .shortcut {
+            display: inline-block;
+            background: #5a5aaa;
+            color: #fff;
+            font-weight: bold;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            border-radius: 3px;
+            margin-right: 6px;
+            font-size: 0.75rem;
+        }
+        #person-list button:hover { background: #5a5aaa; }
+        #new-person-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        #new-person-row input {
+            padding: 5px 10px;
+            font-size: 0.85rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            width: 160px;
+        }
+        #new-person-row button {
+            padding: 5px 12px;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>ImSor — Annotations</h1>
+    <div id="controls" style="display:none;">
+        <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
+        <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
+    </div>
+    <div id="status"></div>
+    <div id="filepath"></div>
+    <div id="loading">Loading annotated images...</div>
+    <div id="image-container" style="display:none;">
+        <img id="main-img" alt="Annotated image">
+    </div>
+    <div id="person-panel">
+        <div class="hint">Click a bounding box to identify the person</div>
+        <div id="person-list"></div>
+        <div id="new-person-row">
+            <input id="new-person-name" type="text" placeholder="New person name">
+            <button onclick="assignNewPerson()">Add</button>
+        </div>
+    </div>
+
+    <script>
+        let entries = [];
+        let knownPeople = [];
+        let currentIndex = 0;
+        let selectedAnn = null;  // annotation object currently selected
+
+        async function loadData() {
+            try {
+                const [imgResp, peopleResp] = await Promise.all([
+                    fetch("/api/annotated-images"),
+                    fetch("/api/known-people"),
+                ]);
+                if (!imgResp.ok) throw new Error(`HTTP ${imgResp.status}`);
+                if (!peopleResp.ok) throw new Error(`HTTP ${peopleResp.status}`);
+                entries = await imgResp.json();
+                knownPeople = await peopleResp.json();
+            } catch (err) {
+                document.getElementById("loading").textContent =
+                    "Error loading annotations: " + err.message;
+                return;
+            }
+
+            document.getElementById("loading").style.display = "none";
+
+            if (entries.length === 0) {
+                document.getElementById("status").textContent =
+                    "No annotated images found.";
+                return;
+            }
+
+            document.getElementById("controls").style.display = "flex";
+            document.getElementById("image-container").style.display = "inline-block";
+            document.getElementById("person-panel").style.display = "flex";
+            showImage();
+        }
+
+        function showImage() {
+            selectedAnn = null;
+            const entry = entries[currentIndex];
+            const image = entry.image;
+            const annotations = entry.annotations;
+
+            document.getElementById("status").textContent =
+                `Image ${currentIndex + 1} of ${entries.length} — ${annotations.length} person(s) detected`;
+            document.getElementById("filepath").textContent = image.file_path;
+
+            const img = document.getElementById("main-img");
+            const container = document.getElementById("image-container");
+
+            // Remove old bounding boxes
+            container.querySelectorAll(".bbox").forEach(el => el.remove());
+
+            img.onload = function () {
+                const scaleX = img.clientWidth / (image.image_width || img.naturalWidth);
+                const scaleY = img.clientHeight / (image.image_height || img.naturalHeight);
+
+                for (const ann of annotations) {
+                    const val = JSON.parse(ann.value);
+                    const box = document.createElement("div");
+                    box.className = "bbox" + (val.person_name ? " named" : "");
+                    box.style.left = (val.x * scaleX) + "px";
+                    box.style.top = (val.y * scaleY) + "px";
+                    box.style.width = (val.width * scaleX) + "px";
+                    box.style.height = (val.height * scaleY) + "px";
+                    box.dataset.annId = ann.id;
+
+                    const label = document.createElement("div");
+                    label.className = "bbox-label";
+                    if (val.person_name) {
+                        label.textContent = val.person_name;
+                    } else {
+                        label.textContent = `person ${(val.confidence * 100).toFixed(0)}%`;
+                    }
+                    box.appendChild(label);
+
+                    box.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        selectBox(ann, box);
+                    });
+
+                    container.appendChild(box);
+                }
+
+                // Auto-select the first unnamed box, or first box if all named
+                const boxes = container.querySelectorAll(".bbox");
+                if (boxes.length > 0) {
+                    let target = null;
+                    let targetAnn = null;
+                    for (const ann of annotations) {
+                        const val = JSON.parse(ann.value);
+                        if (!val.person_name) {
+                            target = container.querySelector(`.bbox[data-ann-id="${ann.id}"]`);
+                            targetAnn = ann;
+                            break;
+                        }
+                    }
+                    if (!target) {
+                        target = boxes[0];
+                        targetAnn = annotations[0];
+                    }
+                    selectBox(targetAnn, target);
+                }
+            };
+
+            img.src = `/serve/${image.id}`;
+            renderPeopleList();
+
+            document.getElementById("btn-prev").disabled = currentIndex === 0;
+            document.getElementById("btn-next").disabled = currentIndex === entries.length - 1;
+        }
+
+        function selectBox(ann, boxEl) {
+            // Deselect previous
+            document.querySelectorAll(".bbox.selected").forEach(el => el.classList.remove("selected"));
+            boxEl.classList.add("selected");
+            selectedAnn = ann;
+            renderPeopleList();
+        }
+
+        function renderPeopleList() {
+            const list = document.getElementById("person-list");
+            list.innerHTML = "";
+            for (let i = 0; i < knownPeople.length; i++) {
+                const name = knownPeople[i];
+                const btn = document.createElement("button");
+                if (i < 10) {
+                    const shortcut = document.createElement("span");
+                    shortcut.className = "shortcut";
+                    shortcut.textContent = (i + 1) % 10;  // 1-9, then 0
+                    btn.appendChild(shortcut);
+                }
+                btn.appendChild(document.createTextNode(name));
+                btn.addEventListener("click", () => assignPerson(name));
+                list.appendChild(btn);
+            }
+        }
+
+        async function assignPerson(name) {
+            if (!selectedAnn) return;
+            const val = JSON.parse(selectedAnn.value);
+            val.person_name = name;
+            const newValue = JSON.stringify(val);
+
+            try {
+                await fetch(`/api/annotations/${selectedAnn.id}`, {
+                    method: "PATCH",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({value: newValue}),
+                });
+            } catch (err) {
+                alert("Error saving: " + err.message);
+                return;
+            }
+
+            // Update local data
+            selectedAnn.value = newValue;
+            // Move name to front of list (most recently used)
+            const idx = knownPeople.indexOf(name);
+            if (idx > 0) knownPeople.splice(idx, 1);
+            if (idx !== 0) knownPeople.unshift(name);
+            selectedAnn = null;
+            showImage();
+            document.body.focus();
+        }
+
+        async function assignNewPerson() {
+            const input = document.getElementById("new-person-name");
+            const name = input.value.trim();
+            if (!name || !selectedAnn) return;
+            input.value = "";
+            input.blur();
+            await assignPerson(name);
+        }
+
+        // Enter in the input: if text, submit as new person; if empty, move to next box
+        document.getElementById("new-person-name").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                const input = document.getElementById("new-person-name");
+                input.blur();
+                if (input.value.trim()) {
+                    assignNewPerson();
+                } else {
+                    selectNextBox();
+                }
+            }
+        });
+
+        function navigate(delta) {
+            currentIndex += delta;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= entries.length) currentIndex = entries.length - 1;
+            showImage();
+        }
+
+        function selectNextBox() {
+            if (!selectedAnn) return;
+            const entry = entries[currentIndex];
+            const annotations = entry.annotations;
+            const curIdx = annotations.findIndex(a => a.id === selectedAnn.id);
+            const nextIdx = (curIdx + 1) % annotations.length;
+            const nextAnn = annotations[nextIdx];
+            const container = document.getElementById("image-container");
+            const nextBox = container.querySelector(`.bbox[data-ann-id="${nextAnn.id}"]`);
+            if (nextBox) selectBox(nextAnn, nextBox);
+        }
+
+        document.addEventListener("keydown", (e) => {
+            // Don't handle shortcuts if typing in the input
+            if (e.target.tagName === "INPUT") return;
+            if (e.key === "ArrowLeft") navigate(-1);
+            if (e.key === "ArrowRight") navigate(1);
+
+            // Enter: focus the person name input
+            if (e.key === "Enter" && selectedAnn) {
+                e.preventDefault();
+                document.getElementById("new-person-name").focus();
+                return;
+            }
+
+            // 1-9 and 0 to assign people (1=first, 2=second, ..., 0=tenth)
+            if (selectedAnn && e.key >= "0" && e.key <= "9") {
+                const idx = e.key === "0" ? 9 : parseInt(e.key) - 1;
+                if (idx < knownPeople.length) {
+                    assignPerson(knownPeople[idx]);
+                }
+            }
+        });
+
+        loadData();
+    </script>
+
+        loadData();
+    </script>
+</body>
+</html>

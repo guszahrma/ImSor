@@ -113,6 +113,11 @@ class AnnotationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AnnotationUpdate(BaseModel):
+    value: str | None = None
+    source: str | None = None
+
+
 # --- Sharing Permissions ---
 
 class SharingPermissionCreate(BaseModel):

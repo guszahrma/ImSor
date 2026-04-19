@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
 from ..models import Annotation, User
-from ..schemas import AnnotationCreate, AnnotationOut
+from ..schemas import AnnotationCreate, AnnotationOut, AnnotationUpdate
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -33,3 +33,22 @@ def list_annotations(
     if image_id is not None:
         query = query.filter(Annotation.image_id == image_id)
     return query.all()
+
+
+@router.patch("/{annotation_id}", response_model=AnnotationOut)
+def update_annotation(
+    annotation_id: int,
+    body: AnnotationUpdate,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_role("admin", "user")),
+):
+    ann = db.query(Annotation).filter(Annotation.id == annotation_id).first()
+    if not ann:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    if body.value is not None:
+        ann.value = body.value
+    if body.source is not None:
+        ann.source = body.source
+    db.commit()
+    db.refresh(ann)
+    return ann

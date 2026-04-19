@@ -19,19 +19,30 @@ class ApiClient:
     def _headers(self):
         return {"Authorization": f"Bearer {self.token}"}
 
+    def _request(self, method, url, **kwargs):
+        """Make a request, automatically re-login on 401."""
+        kwargs.setdefault("headers", self._headers())
+        resp = requests.request(method, url, **kwargs)
+        if resp.status_code == 401:
+            self.login()
+            kwargs["headers"] = self._headers()
+            resp = requests.request(method, url, **kwargs)
+        resp.raise_for_status()
+        return resp
+
     def get_image_by_path(self, file_path: str) -> dict | None:
         """Look up an image record by its file path. Returns None if not found."""
-        resp = requests.get(
+        resp = self._request(
+            "GET",
             f"{self.base_url}/images/",
             params={"file_path": file_path, "limit": 1},
-            headers=self._headers(),
         )
-        resp.raise_for_status()
         results = resp.json()
         return results[0] if results else None
 
     def create_annotation(self, image_id: int, annotation_type: str, value: str, source: str = "ai") -> dict:
-        resp = requests.post(
+        resp = self._request(
+            "POST",
             f"{self.base_url}/annotations/",
             json={
                 "image_id": image_id,
@@ -39,16 +50,13 @@ class ApiClient:
                 "value": value,
                 "source": source,
             },
-            headers=self._headers(),
         )
-        resp.raise_for_status()
         return resp.json()
 
     def get_annotations(self, image_id: int) -> list[dict]:
-        resp = requests.get(
+        resp = self._request(
+            "GET",
             f"{self.base_url}/annotations/",
             params={"image_id": image_id},
-            headers=self._headers(),
         )
-        resp.raise_for_status()
         return resp.json()
