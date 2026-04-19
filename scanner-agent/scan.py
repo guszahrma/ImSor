@@ -1,12 +1,61 @@
 import argparse
+import msvcrt
 import os
 import platform
 import re
+import signal
 import subprocess
 import sys
 
 from api_client import ApiClient
 from scanner import find_images, build_image_data
+
+
+# --- Graceful stop / pause state ---
+_stop_requested = False
+_paused = False
+
+
+def _handle_sigint(sig, frame):
+    global _stop_requested
+    if _stop_requested:
+        print("\nForce quit.")
+        sys.exit(1)
+    _stop_requested = True
+    print("\n  Stop requested — finishing current file, then stopping.")
+    print("  Press Ctrl+C again to force quit.")
+
+
+signal.signal(signal.SIGINT, _handle_sigint)
+
+
+def _check_keyboard():
+    """Check for pause (P) or quit (Q) key presses without blocking."""
+    global _paused, _stop_requested
+    while msvcrt.kbhit():
+        key = msvcrt.getch().lower()
+        if key == b'p':
+            _paused = not _paused
+            if _paused:
+                print("\n  PAUSED — press P to resume, Q to quit.")
+            else:
+                print("  Resuming...")
+        elif key == b'q':
+            _stop_requested = True
+            _paused = False
+            print("\n  Quit requested — finishing current file, then stopping.")
+
+    if _paused:
+        while _paused and not _stop_requested:
+            if msvcrt.kbhit():
+                key = msvcrt.getch().lower()
+                if key == b'p':
+                    _paused = False
+                    print("  Resuming...")
+                elif key == b'q':
+                    _stop_requested = True
+                    _paused = False
+                    print("  Quit requested — stopping.")
 
 
 def _is_bare_server(path: str) -> bool:
@@ -83,6 +132,11 @@ def _scan_folder(folder: str, scanner_host: str, client: ApiClient) -> dict:
             all_checksums.setdefault(img["checksum"], []).append(img["id"])
 
     for i, file_path in enumerate(local_files, 1):
+        _check_keyboard()
+        if _stop_requested:
+            print(f"\n  Stopped at file {i}/{len(local_files)}.")
+            break
+
         print(f"  [{i}/{len(local_files)}] {file_path} ... ", end="", flush=True)
         try:
             image_data = build_image_data(file_path, scanner_host)
@@ -183,10 +237,13 @@ def main():
         print(f"ERROR: Failed to log in: {e}")
         sys.exit(1)
     print("  OK\n")
+    print("  Controls: P = pause/resume, Q = stop gracefully, Ctrl+C = stop after current file\n")
 
     # Scan each folder
     totals = {"new": 0, "updated": 0, "unchanged": 0, "errors": 0, "missing": 0, "duplicates": 0}
     for i, scan_folder in enumerate(folders, 1):
+        if _stop_requested:
+            break
         if len(folders) > 1:
             print(f"=== Share {i}/{len(folders)}: {scan_folder} ===")
         if not os.path.isdir(scan_folder):
@@ -198,7 +255,7 @@ def main():
         print()
 
     # Summary
-    print(f"--- Summary ---")
+    print(f"--- Summary {'(stopped early) ' if _stop_requested else ''}---")
     print(f"  New:       {totals['new']}")
     print(f"  Updated:   {totals['updated']}")
     print(f"  Unchanged: {totals['unchanged']}")
