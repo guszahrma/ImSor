@@ -44,12 +44,15 @@ def list_images(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     scanner_host: str | None = Query(None),
+    file_path: str | None = Query(None),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
     query = db.query(Image)
     if scanner_host is not None:
         query = query.filter(Image.scanner_host == scanner_host)
+    if file_path is not None:
+        query = query.filter(Image.file_path == file_path)
     return query.offset(skip).limit(limit).all()
 
 

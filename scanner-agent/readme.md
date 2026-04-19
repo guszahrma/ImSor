@@ -15,7 +15,7 @@ again on the same folder will detect changes (new, modified, or deleted files).
    ```
 3. Install dependencies:
    ```
-   pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 
 ## Configuration

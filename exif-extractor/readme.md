@@ -14,7 +14,7 @@ in your photos.
    ```
 2. Install dependencies:
    ```
-   pip install -r requirements.txt
+   python -m pip install -r requirements.txt
    ```
 
 ## Usage
