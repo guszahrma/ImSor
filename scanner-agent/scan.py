@@ -1,47 +1,76 @@
 import argparse
+import os
 import platform
+import re
+import subprocess
 import sys
 
 from api_client import ApiClient
 from scanner import find_images, build_image_data
 
 
-def main():
-    parser = argparse.ArgumentParser(description="ImSor Scanner Agent")
-    parser.add_argument("folder", help="Path to the folder to scan (recursive)")
-    parser.add_argument("--host", default=platform.node(), help="Hostname to identify this scanner (default: computer name)")
-    args = parser.parse_args()
+def _is_bare_server(path: str) -> bool:
+    """Return True if path is a bare server name like \\\\server or \\\\server\\."""
+    return bool(re.match(r'^\\\\[^\\]+\\?$', path))
 
-    folder = args.folder
-    scanner_host = args.host
 
-    print(f"ImSor Scanner Agent")
-    print(f"  Folder: {folder}")
-    print(f"  Host:   {scanner_host}")
-    print()
-
-    # 1. Authenticate
-    print("Logging in to central service...")
-    client = ApiClient()
+def _enumerate_shares(server: str) -> list[str]:
+    """Use 'net view' to list non-hidden shares on a server. Returns UNC paths."""
+    server = server.rstrip("\\")
     try:
-        client.login()
+        result = subprocess.run(
+            ["net", "view", server],
+            capture_output=True, text=True, timeout=30
+        )
     except Exception as e:
-        print(f"ERROR: Failed to log in: {e}")
+        print(f"ERROR: Failed to enumerate shares on {server}: {e}")
         sys.exit(1)
-    print("  OK")
 
-    # 2. Get already-registered images for this host
-    print("Fetching registered images for this host...")
+    if result.returncode != 0:
+        print(f"ERROR: 'net view {server}' failed:")
+        print(f"  {result.stderr.strip()}")
+        sys.exit(1)
+
+    shares = []
+    in_table = False
+    for line in result.stdout.splitlines():
+        if line.startswith("---"):
+            in_table = True
+            continue
+        if in_table:
+            if not line.strip():
+                break
+            # First column is the share name, separated by spaces
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == "Disk":
+                share_name = parts[0]
+                if not share_name.endswith("$"):
+                    shares.append(f"{server}\\{share_name}")
+
+    return shares
+
+
+def _validate_folder(folder: str) -> None:
+    """Check that a folder path is accessible."""
+    if not os.path.isdir(folder):
+        print(f"ERROR: '{folder}' is not a valid directory or is not accessible.")
+        sys.exit(1)
+
+
+def _scan_folder(folder: str, scanner_host: str, client: ApiClient) -> dict:
+    """Scan a single folder and return summary counts."""
+    # Get already-registered images for this host
+    print(f"Fetching registered images for this host...")
     registered = client.get_registered_images(scanner_host)
     registered_by_path = {img["file_path"]: img for img in registered}
     print(f"  {len(registered)} images already registered")
 
-    # 3. Scan local folder
+    # Scan folder
     print(f"Scanning {folder} for images...")
     local_files = find_images(folder)
     print(f"  {len(local_files)} image files found")
 
-    # 4. Compare and sync
+    # Compare and sync
     new_count = 0
     updated_count = 0
     unchanged_count = 0
@@ -64,7 +93,6 @@ def main():
                 if existing["checksum"] == image_data["checksum"] and existing["file_size"] == image_data["file_size"]:
                     print("unchanged")
                     unchanged_count += 1
-                    # Still track checksum for duplicate detection
                     all_checksums.setdefault(image_data["checksum"], [])
                     if existing["id"] not in all_checksums[image_data["checksum"]]:
                         all_checksums[image_data["checksum"]].append(existing["id"])
@@ -86,7 +114,7 @@ def main():
             print(f"ERROR: {e}")
             error_count += 1
 
-    # 5. Detect files that were deleted locally but still registered
+    # Detect files that were deleted locally but still registered
     local_set = set(local_files)
     missing = [path for path in registered_by_path if path.startswith(folder) and path not in local_set]
     if missing:
@@ -94,7 +122,7 @@ def main():
         for path in missing:
             print(f"  - {path}")
 
-    # 6. Report duplicate candidates
+    # Report duplicate candidates
     print("\nChecking for duplicate candidates...")
     dup_count = 0
     for checksum, ids in all_checksums.items():
@@ -107,14 +135,76 @@ def main():
                     except Exception:
                         pass  # Pair might already exist
 
-    # 7. Summary
-    print(f"\n--- Summary ---")
-    print(f"  New:       {new_count}")
-    print(f"  Updated:   {updated_count}")
-    print(f"  Unchanged: {unchanged_count}")
-    print(f"  Errors:    {error_count}")
-    print(f"  Missing:   {len(missing)}")
-    print(f"  Duplicate pairs found: {dup_count}")
+    return {
+        "new": new_count,
+        "updated": updated_count,
+        "unchanged": unchanged_count,
+        "errors": error_count,
+        "missing": len(missing),
+        "duplicates": dup_count,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="ImSor Scanner Agent")
+    parser.add_argument("folder", help="Path to the folder to scan (recursive)")
+    parser.add_argument("--host", default=platform.node(), help="Hostname to identify this scanner (default: computer name)")
+    args = parser.parse_args()
+
+    folder = args.folder
+    scanner_host = args.host
+
+    # Determine folders to scan
+    if _is_bare_server(folder):
+        print(f"Detected server name: {folder}")
+        print("Enumerating network shares...")
+        folders = _enumerate_shares(folder)
+        if not folders:
+            print("ERROR: No accessible disk shares found on this server.")
+            sys.exit(1)
+        print(f"  Found {len(folders)} share(s): {', '.join(folders)}")
+        print()
+    else:
+        _validate_folder(folder)
+        folders = [folder]
+
+    print(f"ImSor Scanner Agent")
+    print(f"  Target:  {folder}")
+    print(f"  Host:    {scanner_host}")
+    print(f"  Folders: {len(folders)}")
+    print()
+
+    # Authenticate
+    print("Logging in to central service...")
+    client = ApiClient()
+    try:
+        client.login()
+    except Exception as e:
+        print(f"ERROR: Failed to log in: {e}")
+        sys.exit(1)
+    print("  OK\n")
+
+    # Scan each folder
+    totals = {"new": 0, "updated": 0, "unchanged": 0, "errors": 0, "missing": 0, "duplicates": 0}
+    for i, scan_folder in enumerate(folders, 1):
+        if len(folders) > 1:
+            print(f"=== Share {i}/{len(folders)}: {scan_folder} ===")
+        if not os.path.isdir(scan_folder):
+            print(f"  Skipping (not accessible)\n")
+            continue
+        counts = _scan_folder(scan_folder, scanner_host, client)
+        for key in totals:
+            totals[key] += counts[key]
+        print()
+
+    # Summary
+    print(f"--- Summary ---")
+    print(f"  New:       {totals['new']}")
+    print(f"  Updated:   {totals['updated']}")
+    print(f"  Unchanged: {totals['unchanged']}")
+    print(f"  Errors:    {totals['errors']}")
+    print(f"  Missing:   {totals['missing']}")
+    print(f"  Duplicate pairs found: {totals['duplicates']}")
 
 
 if __name__ == "__main__":
