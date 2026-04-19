@@ -15,6 +15,12 @@ def create_duplicate_pair(
     db: Session = Depends(get_db),
     _current: User = Depends(require_role("admin", "user")),
 ):
+    existing = db.query(DuplicatePair).filter_by(
+        image_a_id=pair.image_a_id, image_b_id=pair.image_b_id
+    ).first()
+    if existing:
+        return existing
+
     db_pair = DuplicatePair(
         image_a_id=pair.image_a_id,
         image_b_id=pair.image_b_id,
