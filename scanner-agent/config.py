@@ -1,11 +1,9 @@
 # Scanner Agent configuration
 
+from credentials import username, password
+
 # Central Web Service URL
 server_url = "http://localhost:8000"
-
-# Credentials for authenticating with the central service (must have "user" or "admin" role)
-username = "admin"
-password = "secret"
 
 # Checksum algorithm: "sha256", "md5", or "sha1"
 checksum_algorithm = "sha256"

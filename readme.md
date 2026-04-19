@@ -66,6 +66,7 @@ Standalone utilities used alongside the main system.
 |------|-------------|---------|
 | [scanner-agent](scanner-agent/) | Scans folders on Windows machines for images, extracts EXIF metadata and checksums, and reports them to the Central Web Service. Detects changes on re-scan. | [scanner-agent/readme.md](scanner-agent/readme.md) |
 | [auto-annotator](auto-annotator/) | Detects people in images using YOLO and stores bounding box annotations in the Central Web Service database. | [auto-annotator/readme.md](auto-annotator/readme.md) |
+| [imsor-web](imsor-web/) | Local web frontend for ImSor — duplicate reviewer, annotations, and more. | [imsor-web/readme.md](imsor-web/readme.md) |
 | [exif-extractor](exif-extractor/) | Extracts all EXIF metadata from an image file and writes it to a JSON file. Useful for inspecting what tags are available in your photos. | [exif-extractor/readme.md](exif-extractor/readme.md) |
 
 ## Developer Setup

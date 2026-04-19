@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImSor — Duplicate Reviewer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 10px;
+            font-size: 1.4rem;
+        }
+        #status {
+            margin-bottom: 20px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        #pair-container {
+            display: flex;
+            gap: 30px;
+            max-width: 95vw;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .image-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .image-panel .filepath {
+            font-size: 0.8rem;
+            color: #ccc;
+            margin-bottom: 8px;
+            word-break: break-all;
+            text-align: center;
+        }
+        .image-panel img {
+            max-height: 70vh;
+            border: 2px solid #333;
+            border-radius: 4px;
+            object-fit: contain;
+            background: #111;
+        }
+        #controls {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 24px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #4a4a8a;
+            color: #fff;
+        }
+        button:hover { background: #5a5aaa; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #loading {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ImSor — Duplicate Reviewer</h1>
+    <div id="controls" style="display:none;">
+        <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
+        <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
+    </div>
+    <div id="status"></div>
+    <div id="loading">Loading duplicate pairs...</div>
+    <div id="set-container" style="display:none;"></div>
+
+    <script>
+        let sets = [];
+        let currentIndex = 0;
+
+        function groupPairsIntoSets(pairs) {
+            // Union-Find to merge overlapping pairs into sets
+            const parent = {};
+            function find(x) {
+                if (!(x in parent)) parent[x] = x;
+                while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+                return x;
+            }
+            function union(a, b) { parent[find(a)] = find(b); }
+
+            const imageMap = {};  // id -> image object
+
+            for (const pair of pairs) {
+                const aId = pair.image_a.id;
+                const bId = pair.image_b.id;
+                imageMap[aId] = pair.image_a;
+                imageMap[bId] = pair.image_b;
+                union(aId, bId);
+            }
+
+            // Group by root
+            const groups = {};
+            for (const id of Object.keys(imageMap)) {
+                const root = find(Number(id));
+                if (!groups[root]) groups[root] = [];
+                groups[root].push(imageMap[id]);
+            }
+
+            return Object.values(groups);
+        }
+
+        async function loadPairs() {
+            let pairs;
+            try {
+                const resp = await fetch("/api/pairs");
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                pairs = await resp.json();
+            } catch (err) {
+                document.getElementById("loading").textContent =
+                    "Error loading pairs: " + err.message;
+                return;
+            }
+
+            document.getElementById("loading").style.display = "none";
+
+            if (pairs.length === 0) {
+                document.getElementById("status").textContent =
+                    "No unresolved duplicate pairs found.";
+                return;
+            }
+
+            sets = groupPairsIntoSets(pairs);
+
+            document.getElementById("set-container").style.display = "flex";
+            document.getElementById("controls").style.display = "flex";
+            showSet();
+        }
+
+        function showSet() {
+            const images = sets[currentIndex];
+            document.getElementById("status").textContent =
+                `Set ${currentIndex + 1} of ${sets.length} — ${images.length} images`;
+
+            const container = document.getElementById("set-container");
+            container.innerHTML = "";
+            container.style.display = "flex";
+            container.style.gap = "30px";
+            container.style.maxWidth = "95vw";
+            container.style.justifyContent = "center";
+            container.style.flexWrap = "wrap";
+
+            // Scale image widths so they share the viewport evenly
+            const maxW = Math.min(Math.floor(90 / images.length), 45);
+
+            for (const img of images) {
+                const panel = document.createElement("div");
+                panel.className = "image-panel";
+                panel.style.maxWidth = maxW + "vw";
+
+                const path = document.createElement("div");
+                path.className = "filepath";
+                path.style.maxWidth = maxW + "vw";
+                path.textContent = img.file_path;
+
+                const imgEl = document.createElement("img");
+                imgEl.src = `/serve/${img.id}`;
+                imgEl.alt = img.file_name;
+                imgEl.style.maxWidth = maxW + "vw";
+
+                panel.appendChild(path);
+                panel.appendChild(imgEl);
+                container.appendChild(panel);
+            }
+
+            document.getElementById("btn-prev").disabled = currentIndex === 0;
+            document.getElementById("btn-next").disabled = currentIndex === sets.length - 1;
+        }
+
+        function navigate(delta) {
+            currentIndex += delta;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= sets.length) currentIndex = sets.length - 1;
+            showSet();
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowLeft") navigate(-1);
+            if (e.key === "ArrowRight") navigate(1);
+        });
+
+        loadPairs();
+    </script>
+</body>
+</html>

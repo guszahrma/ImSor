@@ -1,11 +1,9 @@
 # Auto Annotator configuration
 
+from credentials import username, password
+
 # Central Web Service URL
 server_url = "http://localhost:8000"
-
-# Credentials for authenticating with the central service (must have "user" or "admin" role)
-username = "admin"
-password = "secret"
 
 # YOLO model to use (downloaded automatically on first run)
 # Options: "yolov8n.pt" (fastest), "yolov8s.pt" (balanced), "yolov8m.pt" (more accurate)
