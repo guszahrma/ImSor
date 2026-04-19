@@ -16,6 +16,15 @@ def compute_checksum(file_path: str) -> str:
     return h.hexdigest()
 
 
+def _clean_str(value) -> str | None:
+    """Strip NUL bytes and whitespace from EXIF string values."""
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return value.replace("\x00", "").strip() or None
+
+
 def extract_exif(file_path: str) -> dict:
     result = {
         "date_taken": None,
@@ -36,7 +45,7 @@ def extract_exif(file_path: str) -> dict:
                 return result
 
             # Date taken
-            date_str = exif_data.get(ExifBase.DateTimeOriginal) or exif_data.get(ExifBase.DateTime)
+            date_str = _clean_str(exif_data.get(ExifBase.DateTimeOriginal) or exif_data.get(ExifBase.DateTime))
             if date_str:
                 for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
                     try:
@@ -46,8 +55,8 @@ def extract_exif(file_path: str) -> dict:
                         continue
 
             # Camera info
-            result["camera_make"] = exif_data.get(ExifBase.Make)
-            result["camera_model"] = exif_data.get(ExifBase.Model)
+            result["camera_make"] = _clean_str(exif_data.get(ExifBase.Make))
+            result["camera_model"] = _clean_str(exif_data.get(ExifBase.Model))
 
             # GPS
             gps_info = exif_data.get_ifd(0x8825)  # GPSInfo IFD
