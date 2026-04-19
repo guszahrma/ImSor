@@ -52,6 +52,21 @@ The system consists of four components, all Python-based.
 * Users interact through the Web Frontend to browse, annotate, review duplicates, manage sharing, and create slideshows.
 
 
+== Supporting Tools ==
+
+Standalone utilities used alongside the main system.
+
+* scanner-agent/
+  Scans folders on Windows machines for images, extracts EXIF metadata and
+  checksums, and reports them to the Central Web Service. Detects changes on
+  re-scan. See "Scanner Agent" section below for full details.
+
+* exif-extractor/
+  Extracts all EXIF metadata from an image file and writes it to a JSON file.
+  Useful for inspecting what tags are available in your photos.
+  See exif-extractor/readme.txt for setup and usage.
+
+
 == Developer Setup ==
 
 --- Prerequisites ---
