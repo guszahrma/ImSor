@@ -8,7 +8,7 @@ class UserCreate(BaseModel):
     username: str
     display_name: str | None = None
     password: str
-    role: str = "user"  # "superuser", "maintainer", "user"
+    role: str = "basic-user"  # "superuser", "maintainer", "basic-user"
 
 class UserOut(BaseModel):
     id: int

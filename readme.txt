@@ -129,9 +129,9 @@ password manager for localhost, or use an incognito/private window.
 
 --- User Roles ---
 The system has three user roles:
-  * admin  - Full access. Can create and delete users, and do everything below.
-  * user   - Can register images, create annotations, manage duplicates.
-  * viewer - Can browse images, view annotations, and view duplicates.
+  * superuser  - Full access. Can create and delete users, and do everything below.
+  * Maintainer   - Can register images, create annotations, manage duplicates.
+  * basic-user - Can browse images, view annotations, and view duplicates.
 
 Only admin users can create new users via POST /users/.
 

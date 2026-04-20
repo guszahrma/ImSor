@@ -13,7 +13,7 @@ router = APIRouter(prefix="/duplicates", tags=["duplicates"])
 def create_duplicate_pair(
     pair: DuplicatePairCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("superuser", "maintainer", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
 ):
     existing = db.query(DuplicatePair).filter_by(
         image_a_id=pair.image_a_id, image_b_id=pair.image_b_id
@@ -45,7 +45,7 @@ def resolve_duplicate(
     pair_id: int,
     body: DuplicatePairResolve,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("superuser", "maintainer", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
 ):
     pair = db.query(DuplicatePair).filter(DuplicatePair.id == pair_id).first()
     if not pair:

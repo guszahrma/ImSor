@@ -14,7 +14,7 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False, index=True)
     display_name = Column(String(200))
     password_hash = Column(String(200), nullable=False)
-    role = Column(String(20), nullable=False, default="user")  # "superuser", "maintainer", "user"
+    role = Column(String(20), nullable=False, default="basic-user")  # "superuser", "maintainer", "basic-user"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     annotations = relationship("Annotation", back_populates="user")

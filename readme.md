@@ -144,9 +144,9 @@ an admin account before you can use the API.
 
 | Role     | Permissions                                                      |
 |----------|------------------------------------------------------------------|
-| `admin`  | Full access. Can create and delete users, and do everything below. |
-| `user`   | Can register images, create annotations, manage duplicates.       |
-| `viewer` | Can browse images, view annotations, and view duplicates.         |
+| `superuser`  | Full access. Can create and delete users, and do everything below. |
+| `basic-user`   | Can register images, create annotations, manage duplicates.       |
+| `maintainer` | Can browse images, view annotations, and view duplicates.         |
 
 Only `admin` users can create new users via `POST /users/`.
 

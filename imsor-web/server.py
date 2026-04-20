@@ -61,7 +61,7 @@ def google_logged_in(blueprint, token):
                 api_client.create_user_via_oauth(
                     username=email,
                     display_name=user_info.get("name"),
-                    role="user",
+                    role="basic-user",
                 )
                 user_record = api_client.get_user_by_username(email)
             except Exception:
@@ -69,7 +69,7 @@ def google_logged_in(blueprint, token):
     # Store user info and role in session
     session["user"] = {
         **user_info,
-        "role": user_record["role"] if user_record else "user",
+        "role": user_record["role"] if user_record else "basic-user",
         "id": user_record["id"] if user_record else None,
     }
     return False  # Prevent Flask-Dance from saving token to DB
@@ -212,7 +212,7 @@ def api_update_user_role(user_id):
         return jsonify({"error": "forbidden"}), 403
     data = request.get_json()
     role = data.get("role")
-    if role not in ("superuser", "maintainer", "user"):
+    if role not in ("superuser", "maintainer", "basic-user"):
         return jsonify({"error": "invalid role"}), 400
     try:
         updated = api_client.update_user_role(user_id, role)

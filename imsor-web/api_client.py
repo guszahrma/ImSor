@@ -4,7 +4,7 @@ def get_user_by_username(username: str) -> dict | None:
         return _request("GET", f"{config.server_url}/users/by-username/{username}").json()
     except Exception:
         return None
-def create_user_via_oauth(username: str, display_name: str | None = None, role: str = "user") -> dict:
+def create_user_via_oauth(username: str, display_name: str | None = None, role: str = "basic-user") -> dict:
     """Create a user in the central service via REST API (for Google OAuth). Password is not set."""
     payload = {
         "username": username,

@@ -92,7 +92,7 @@ def update_user_role(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if role not in ("superuser", "maintainer", "user"):
+    if role not in ("superuser", "maintainer", "basic-user"):
         raise HTTPException(status_code=400, detail="Invalid role")
     user.role = role
     db.commit()
