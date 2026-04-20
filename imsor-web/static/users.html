@@ -54,8 +54,41 @@
             const tbody = document.querySelector('#user-table tbody');
             users.forEach(u => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${u.id}</td><td>${u.username}</td><td>${u.display_name || ''}</td><td>${u.role}</td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>`;
+                const isSelf = u.id === user.id;
+                const roleOptions = ['superuser', 'maintainer', 'user'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('');
+                tr.innerHTML = `
+                    <td>${u.id}</td>
+                    <td>${u.username}</td>
+                    <td>${u.display_name || ''}</td>
+                    <td>
+                        <select data-user-id="${u.id}" class="role-select"${isSelf ? ' disabled' : ''}>${roleOptions}</select>
+                    </td>
+                    <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
+                `;
                 tbody.appendChild(tr);
+            });
+            // Add event listeners for role changes
+            document.querySelectorAll('.role-select').forEach(sel => {
+                sel.addEventListener('change', async function() {
+                    const userId = this.getAttribute('data-user-id');
+                    const newRole = this.value;
+                    this.disabled = true;
+                    try {
+                        const resp = await fetch(`/api/users/${userId}/role`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ role: newRole })
+                        });
+                        if (!resp.ok) throw new Error('Failed to update role');
+                        this.style.background = '#c8e6c9'; // green highlight
+                    } catch (e) {
+                        alert('Failed to update role: ' + e.message);
+                        this.style.background = '#ffcdd2'; // red highlight
+                    } finally {
+                        this.disabled = false;
+                        setTimeout(() => { this.style.background = ''; }, 1200);
+                    }
+                });
             });
         } catch (e) {
             tbody.innerHTML = '<tr><td colspan="5">Failed to load users.</td></tr>';

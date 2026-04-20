@@ -1,6 +1,4 @@
-
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 
 from ..auth import hash_password, require_role, get_current_user
@@ -83,3 +81,20 @@ def delete_user(
     db.delete(user)
     db.commit()
     return {"detail": "User deleted"}
+
+@router.patch("/{user_id}/role", response_model=UserOut)
+def update_user_role(
+    user_id: int,
+    role: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if role not in ("superuser", "maintainer", "user"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user

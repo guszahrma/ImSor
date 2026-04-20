@@ -13,6 +13,9 @@ def create_user_via_oauth(username: str, display_name: str | None = None, role: 
         "role": role,
     }
     return _request("POST", f"{config.server_url}/users/", json=payload).json()
+def update_user_role(user_id: int, role: str) -> dict:
+    """Update a user's role in the central service."""
+    return _request("PATCH", f"{config.server_url}/users/{user_id}/role", json={"role": role}).json()
 import requests
 
 import config

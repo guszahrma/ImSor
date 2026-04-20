@@ -205,6 +205,22 @@ def api_users():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/users/<int:user_id>/role", methods=["PATCH"])
+def api_update_user_role(user_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json()
+    role = data.get("role")
+    if role not in ("superuser", "maintainer", "user"):
+        return jsonify({"error": "invalid role"}), 400
+    try:
+        updated = api_client.update_user_role(user_id, role)
+        return jsonify(updated)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     import config
     print(f"ImSor Web running at https://{config.host}:{config.port}")
