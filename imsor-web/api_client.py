@@ -1,3 +1,18 @@
+def get_user_by_username(username: str) -> dict | None:
+    """Fetch a user by username (email) from the central service. Returns None if not found."""
+    try:
+        return _request("GET", f"{config.server_url}/users/by-username/{username}").json()
+    except Exception:
+        return None
+def create_user_via_oauth(username: str, display_name: str | None = None, role: str = "user") -> dict:
+    """Create a user in the central service via REST API (for Google OAuth). Password is not set."""
+    payload = {
+        "username": username,
+        "display_name": display_name,
+        "password": "oauth_placeholder",  # Not used, but required by schema
+        "role": role,
+    }
+    return _request("POST", f"{config.server_url}/users/", json=payload).json()
 import requests
 
 import config
@@ -53,6 +68,10 @@ def get_annotations(image_id: int) -> list[dict]:
 
 def get_all_annotations() -> list[dict]:
     return _request("GET", f"{config.server_url}/annotations/").json()
+
+
+def get_all_users() -> list[dict]:
+    return _request("GET", f"{config.server_url}/users/").json()
 
 
 def update_annotation(annotation_id: int, value: str) -> dict:

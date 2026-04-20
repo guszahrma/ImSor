@@ -1,3 +1,5 @@
+
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -8,12 +10,24 @@ from ..schemas import UserCreate, UserOut
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+# Endpoint to get user by username (email)
+@router.get("/by-username/{username}", response_model=UserOut)
+def get_user_by_username(
+    username: str,
+    db: Session = Depends(get_db),
+    _current: User = Depends(get_current_user),
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
 
 @router.post("/", response_model=UserOut)
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_role("admin")),
+    _admin: User = Depends(require_role("superuser", "maintainer")),
 ):
     existing = db.query(User).filter(User.username == user.username).first()
     if existing:
@@ -59,7 +73,7 @@ def get_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_role("admin")),
+    admin: User = Depends(require_role("superuser", "maintainer")),
 ):
     if user_id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")

@@ -20,13 +20,13 @@ def run_setup(body: SetupRequest, db: Session = Depends(get_db)):
     if db.query(User).first() is not None:
         raise HTTPException(status_code=400, detail="Setup already completed")
 
-    admin = User(
+    superuser = User(
         username=body.username,
         display_name=body.display_name,
         password_hash=hash_password(body.password),
-        role="admin",
+        role="superuser",
     )
-    db.add(admin)
+    db.add(superuser)
     db.commit()
-    db.refresh(admin)
-    return admin
+    db.refresh(superuser)
+    return superuser

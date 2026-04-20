@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User List</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>All Users</h1>
+    <div id="not-authorized" class="hidden">
+        <p><strong>Access denied:</strong> Only superusers can view this page.</p>
+    </div>
+    <div id="user-table-container" class="hidden">
+        <table id="user-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Display Name</th>
+                    <th>Role</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+    async function getCurrentUser() {
+        const resp = await fetch('/api/current_user');
+        if (!resp.ok) return null;
+        return (await resp.json()).user;
+    }
+    async function getAllUsers() {
+        const resp = await fetch('/api/users');
+        if (!resp.ok) throw new Error('Failed to fetch users');
+        return await resp.json();
+    }
+    (async function() {
+        const user = await getCurrentUser();
+        if (!user || user.role !== 'superuser') {
+            document.getElementById('not-authorized').classList.remove('hidden');
+            return;
+        }
+        document.getElementById('user-table-container').classList.remove('hidden');
+        try {
+            const users = await getAllUsers();
+            const tbody = document.querySelector('#user-table tbody');
+            users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${u.id}</td><td>${u.username}</td><td>${u.display_name || ''}</td><td>${u.role}</td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5">Failed to load users.</td></tr>';
+        }
+    })();
+    </script>
+</body>
+</html>

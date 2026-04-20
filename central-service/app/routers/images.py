@@ -13,7 +13,7 @@ router = APIRouter(prefix="/images", tags=["images"])
 def register_image(
     image: ImageCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("admin", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "user")),
 ):
     db_image = Image(**image.model_dump())
     db.add(db_image)
@@ -27,7 +27,7 @@ def update_image(
     image_id: int,
     image: ImageCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("admin", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "user")),
 ):
     db_image = db.query(Image).filter(Image.id == image_id).first()
     if not db_image:

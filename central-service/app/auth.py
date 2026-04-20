@@ -42,8 +42,10 @@ def get_current_user(
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(f"[DEBUG] JWT payload: {payload}")
         user_id = int(payload.get("sub"))
     except (JWTError, TypeError, ValueError):
         raise credentials_exception

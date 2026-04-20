@@ -1,7 +1,3 @@
-
-
-
-
 import json
 import mimetypes
 import os
@@ -21,10 +17,11 @@ app.secret_key = os.environ.get("IMSOR_SECRET_KEY", "imsor_dev_secret")
 @app.route("/api/current_user")
 def api_current_user():
     user = session.get("user")
+    print("[DEBUG] /api/current_user session user:", user)
     if user:
         return jsonify({"logged_in": True, "user": user})
     else:
-        return jsonify({"logged_in": False}), 200
+        return jsonify({"logged_in": False, "user": None}), 200
 
 
 # Google OAuth setup
@@ -42,6 +39,7 @@ google_bp = make_google_blueprint(
 app.register_blueprint(google_bp, url_prefix="/login")
 
 # Store user info in session after successful OAuth
+
 @oauth_authorized.connect_via(google_bp)
 def google_logged_in(blueprint, token):
     if not token:
@@ -52,7 +50,28 @@ def google_logged_in(blueprint, token):
         flash("Failed to fetch user info from Google.", category="error")
         return False
     user_info = resp.json()
-    session["user"] = user_info
+
+    # Register user in central-service if not exists, and always fetch user record
+    email = user_info.get("email")
+    user_record = None
+    if email:
+        user_record = api_client.get_user_by_username(email)
+        if not user_record:
+            try:
+                api_client.create_user_via_oauth(
+                    username=email,
+                    display_name=user_info.get("name"),
+                    role="user",
+                )
+                user_record = api_client.get_user_by_username(email)
+            except Exception:
+                pass
+    # Store user info and role in session
+    session["user"] = {
+        **user_info,
+        "role": user_record["role"] if user_record else "user",
+        "id": user_record["id"] if user_record else None,
+    }
     return False  # Prevent Flask-Dance from saving token to DB
 
 
@@ -172,6 +191,18 @@ def serve_image(image_id: int):
 
     mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     return send_file(file_path, mimetype=mime_type)
+
+
+@app.route("/api/users")
+def api_users():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    try:
+        users = api_client.get_all_users()
+        return jsonify(users)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

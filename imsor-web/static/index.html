@@ -65,6 +65,11 @@
             <div class="label">Annotations</div>
             <div class="desc">View images with person detections</div>
         </a>
+        <a class="nav-card" id="users-nav-card" href="/static/users.html" style="display:none;">
+            <div class="icon">&#128101;</div>
+            <div class="label">Users</div>
+            <div class="desc">View and manage all users (superuser only)</div>
+        </a>
     </div>
     <div id="auth-section" style="margin-top: 40px;"></div>
     <script>
@@ -107,6 +112,19 @@
         }
     }
     updateAuthSection();
-    </script>
+    // Show Users button only for superusers
+    async function showUsersButtonIfSuperuser() {
+        try {
+            const resp = await fetch('/api/current_user');
+            const data = await resp.json();
+            if (data.logged_in && data.user && data.user.role === 'superuser') {
+                document.getElementById('users-nav-card').style.display = '';
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
+    showUsersButtonIfSuperuser();
+</script>
 </body>
 </html>

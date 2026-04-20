@@ -14,7 +14,7 @@ router = APIRouter(prefix="/annotations", tags=["annotations"])
 def create_annotation(
     annotation: AnnotationCreate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("admin", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "user")),
 ):
     db_annotation = Annotation(**annotation.model_dump())
     db.add(db_annotation)
@@ -40,7 +40,7 @@ def update_annotation(
     annotation_id: int,
     body: AnnotationUpdate,
     db: Session = Depends(get_db),
-    _current: User = Depends(require_role("admin", "user")),
+    _current: User = Depends(require_role("superuser", "maintainer", "user")),
 ):
     ann = db.query(Annotation).filter(Annotation.id == annotation_id).first()
     if not ann:
