@@ -1,17 +1,73 @@
+
+
+
+
 import json
 import mimetypes
 import os
 from pathlib import Path
-
-from flask import Flask, jsonify, request, send_file, abort
-
+from flask_dance.consumer import oauth_authorized
+from flask import flash
+from flask import Flask, jsonify, request, send_file, abort, redirect, url_for, session
+from flask_dance.contrib.google import make_google_blueprint, google
 import api_client
+import sys
+
+sys.path.append(str(Path(__file__).parent.parent / "auto-annotator"))
+import credentials
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get("IMSOR_SECRET_KEY", "imsor_dev_secret")
+@app.route("/api/current_user")
+def api_current_user():
+    user = session.get("user")
+    if user:
+        return jsonify({"logged_in": True, "user": user})
+    else:
+        return jsonify({"logged_in": False}), 200
+
+
+# Google OAuth setup
+google_bp = make_google_blueprint(
+    client_id=credentials.GOOGLE_CLIENT_ID,
+    client_secret=credentials.GOOGLE_CLIENT_SECRET,
+    scope=[
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email"
+    ],
+    redirect_to="index",
+    reprompt_select_account=True
+)
+app.register_blueprint(google_bp, url_prefix="/login")
+
+# Store user info in session after successful OAuth
+@oauth_authorized.connect_via(google_bp)
+def google_logged_in(blueprint, token):
+    if not token:
+        flash("Failed to log in with Google.", category="error")
+        return False
+    resp = blueprint.session.get("/oauth2/v2/userinfo")
+    if not resp.ok:
+        flash("Failed to fetch user info from Google.", category="error")
+        return False
+    user_info = resp.json()
+    session["user"] = user_info
+    return False  # Prevent Flask-Dance from saving token to DB
+
+
+
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    session.pop("google_oauth_token", None)
+    return redirect(url_for("index"))
 
 
 @app.route("/")
 def index():
+    print("[DEBUG] Session at /:", dict(session))
     return send_file(Path(__file__).parent / "static" / "index.html")
 
 
@@ -120,6 +176,6 @@ def serve_image(image_id: int):
 
 if __name__ == "__main__":
     import config
-
-    print(f"ImSor Web running at http://{config.host}:{config.port}")
-    app.run(host=config.host, port=config.port, debug=False)
+    print(f"ImSor Web running at https://{config.host}:{config.port}")
+    # Use HTTPS with self-signed certs for local development
+    app.run(host=config.host, port=config.port, debug=False, ssl_context=("cert.pem", "key.pem"))

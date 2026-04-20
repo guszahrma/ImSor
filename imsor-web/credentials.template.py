@@ -3,3 +3,5 @@
 
 username = "admin"
 password = "changeme"
+GOOGLE_CLIENT_ID = "changeme" 
+GOOGLE_CLIENT_SECRET = "changeme"

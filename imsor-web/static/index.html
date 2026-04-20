@@ -66,5 +66,47 @@
             <div class="desc">View images with person detections</div>
         </a>
     </div>
+    <div id="auth-section" style="margin-top: 40px;"></div>
+    <script>
+    async function updateAuthSection() {
+        const section = document.getElementById('auth-section');
+        section.innerHTML = '<span style="color:#aaa">Checking login status...</span>';
+        try {
+            const resp = await fetch('/api/current_user');
+            const data = await resp.json();
+            if (data.logged_in) {
+                const user = data.user;
+                section.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <img src="${user.picture}" alt="avatar" style="width:40px;height:40px;border-radius:50%;border:2px solid #4285F4;">
+                        <span>Welcome, <b>${user.given_name || user.name}</b>!</span>
+                        <a href="/logout" style="margin-left:20px;background:#e74c3c;color:white;padding:8px 18px;border-radius:4px;text-decoration:none;font-weight:600;">Logout</a>
+                    </div>
+                `;
+            } else {
+                section.innerHTML = `
+                    <a href="/login/google?prompt=select_account" style="
+                        display: inline-block;
+                        background: #4285F4;
+                        color: white;
+                        padding: 12px 28px;
+                        border-radius: 4px;
+                        font-size: 1rem;
+                        text-decoration: none;
+                        font-weight: 600;
+                        box-shadow: 0 2px 8px rgba(66,133,244,0.15);
+                        transition: background 0.2s;"
+                        onmouseover="this.style.background='#3367D6'" onmouseout="this.style.background='#4285F4'">
+                        <span style="vertical-align: middle; margin-right: 8px; font-size: 1.2em;">&#x1F464;</span>
+                        Login with Google
+                    </a>
+                `;
+            }
+        } catch (e) {
+            section.innerHTML = '<span style="color:#e74c3c">Failed to check login status.</span>';
+        }
+    }
+    updateAuthSection();
+    </script>
 </body>
 </html>
