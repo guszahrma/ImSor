@@ -1,19 +1,50 @@
 import json
 import mimetypes
 import os
+import sys
+import ssl
 from pathlib import Path
+
+# Workaround for Python 3.13 SSL UNEXPECTED_EOF_WHILE_READING bug with Google OAuth
+_ssl_ops = (
+    getattr(ssl, 'OP_LEGACY_SERVER_CONNECT', 0) |
+    getattr(ssl, 'OP_IGNORE_UNEXPECTED_EOF', 0)
+)
+if _ssl_ops:
+    _orig_wrap_socket = ssl.SSLContext.wrap_socket
+    def _patched_wrap_socket(self, *args, **kwargs):
+        self.options |= _ssl_ops
+        return _orig_wrap_socket(self, *args, **kwargs)
+    ssl.SSLContext.wrap_socket = _patched_wrap_socket
+
+sys.path.append(str(Path(__file__).parent.parent / "auto-annotator"))
+
+import credentials
 from flask_dance.consumer import oauth_authorized
 from flask import flash
 from flask import Flask, jsonify, request, send_file, abort, redirect, url_for, session
 from flask_dance.contrib.google import make_google_blueprint, google
 import api_client
-import sys
+import config
+from pathlib import PurePosixPath, Path
 
-sys.path.append(str(Path(__file__).parent.parent / "auto-annotator"))
-import credentials
+
+def resolve_path(stored_path: str) -> str:
+    """Convert a stored forward-slash UNC path to a local filesystem path
+    using the mappings defined in config.path_mappings."""
+    p = PurePosixPath(stored_path)
+    for prefix, local_mount in config.path_mappings.items():
+        try:
+            relative = p.relative_to(PurePosixPath(prefix))
+            return str(Path(local_mount) / relative)
+        except ValueError:
+            continue
+    return stored_path  # fallback: return as-is
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = os.environ.get("IMSOR_SECRET_KEY", "imsor_dev_secret")
+app.config['SERVER_NAME'] = config.server_name
+app.config['PREFERRED_URL_SCHEME'] = 'https'
 @app.route("/api/current_user")
 def api_current_user():
     user = session.get("user")
@@ -185,7 +216,7 @@ def serve_image(image_id: int):
     except Exception:
         abort(404)
 
-    file_path = image["file_path"]
+    file_path = resolve_path(image["file_path"])
     if not os.path.isfile(file_path):
         abort(404)
 
@@ -222,7 +253,6 @@ def api_update_user_role(user_id):
 
 
 if __name__ == "__main__":
-    import config
     print(f"ImSor Web running at https://{config.host}:{config.port}")
     # Use HTTPS with self-signed certs for local development
     app.run(host=config.host, port=config.port, debug=False, ssl_context=("cert.pem", "key.pem"))
