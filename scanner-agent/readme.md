@@ -9,14 +9,22 @@ again on the same folder will detect changes (new, modified, or deleted files).
 
 1. Install Python 3.10 or newer from <https://www.python.org/downloads/>
    - During installation, check **Add Python to PATH**.
-2. Open a terminal and navigate to the scanner-agent folder:
+2. Open a PowerShell terminal and navigate to the scanner-agent folder:
    ```
    cd scanner-agent
    ```
-3. Install dependencies:
+3. Create and activate a virtual environment:
+   ```
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   ```
+   You should see `(venv)` appear at the start of your prompt.
+4. Install dependencies:
    ```
    python -m pip install -r requirements.txt
    ```
+
+> **Note:** Each time you open a new terminal to run the scanner, activate the virtual environment first with `.\venv\Scripts\Activate.ps1`.
 
 ## Configuration
 
@@ -24,7 +32,7 @@ Edit [`config.py`](config.py) before running:
 
 | Setting              | Description                                             | Default                  |
 |----------------------|---------------------------------------------------------|--------------------------|
-| `server_url`         | URL of the Central Web Service                          | `http://localhost:8000`  |
+| `server_urls`        | URLs of the Central Web Service per environment         | dev: 8000, prod: 8001    |
 | `username`/`password`| Credentials for an account with `user` or `admin` role  | —                        |
 | `checksum_algorithm` | Hash algorithm for duplicate detection                  | `sha256`                 |
 | `image_extensions`   | List of file extensions to scan for                     | see config.py            |
@@ -33,6 +41,12 @@ Edit [`config.py`](config.py) before running:
 
 ```
 python scan.py "C:\path\to\your\photos"
+```
+
+By default the scanner reports to the **dev** environment. Use `--env prod` to target production:
+
+```
+python scan.py "C:\path\to\your\photos" --env prod
 ```
 
 The scanner will:
@@ -44,10 +58,16 @@ The scanner will:
 5. Report if any previously registered files have been deleted locally.
 6. Create duplicate candidate pairs for images with matching checksums.
 
-Optional — use `--host` to specify a custom hostname (defaults to your computer name):
+Optional flags:
 
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--env dev\|prod` | Target environment | `dev` |
+| `--host <name>` | Hostname to identify this scanner | your computer name |
+
+Example:
 ```
-python scan.py "C:\Photos" --host my-desktop
+python scan.py "C:\Photos" --env prod --host my-desktop
 ```
 
 ## Supported image formats

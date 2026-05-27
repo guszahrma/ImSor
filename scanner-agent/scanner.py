@@ -1,11 +1,19 @@
 import hashlib
 import os
 from datetime import datetime
+from pathlib import PurePosixPath, PureWindowsPath
 
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
 from config import checksum_algorithm, image_extensions
+
+
+def normalize_path(path: str) -> str:
+    """Normalize a Windows path to forward-slash UNC format for cross-platform storage.
+    e.g. \\\\server\\share\\folder\\file.jpg -> //server/share/folder/file.jpg
+    """
+    return str(PureWindowsPath(path)).replace("\\", "/")
 
 
 def compute_checksum(file_path: str) -> str:
@@ -102,7 +110,7 @@ def build_image_data(file_path: str, scanner_host: str) -> dict:
     stat = os.stat(file_path)
     exif = extract_exif(file_path)
     return {
-        "file_path": file_path,
+        "file_path": normalize_path(file_path),
         "file_name": os.path.basename(file_path),
         "file_size": stat.st_size,
         "checksum": compute_checksum(file_path),

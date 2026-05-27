@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from api_client import ApiClient
+from config import server_urls
 from scanner import find_images, build_image_data
 
 
@@ -203,10 +204,12 @@ def main():
     parser = argparse.ArgumentParser(description="ImSor Scanner Agent")
     parser.add_argument("folder", help="Path to the folder to scan (recursive)")
     parser.add_argument("--host", default=platform.node(), help="Hostname to identify this scanner (default: computer name)")
+    parser.add_argument("--env", choices=["dev", "prod"], default="dev", help="Target environment (default: dev)")
     args = parser.parse_args()
 
     folder = args.folder
     scanner_host = args.host
+    server_url = server_urls[args.env]
 
     # Determine folders to scan
     if _is_bare_server(folder):
@@ -223,6 +226,7 @@ def main():
         folders = [folder]
 
     print(f"ImSor Scanner Agent")
+    print(f"  Environment: {args.env} ({server_url})")
     print(f"  Target:  {folder}")
     print(f"  Host:    {scanner_host}")
     print(f"  Folders: {len(folders)}")
@@ -230,7 +234,7 @@ def main():
 
     # Authenticate
     print("Logging in to central service...")
-    client = ApiClient()
+    client = ApiClient(server_url)
     try:
         client.login()
     except Exception as e:

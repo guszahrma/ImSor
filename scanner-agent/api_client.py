@@ -1,10 +1,10 @@
 import requests
 
-from config import server_url, username, password
+from config import username, password
 
 
 class ApiClient:
-    def __init__(self):
+    def __init__(self, server_url: str):
         self.base_url = server_url.rstrip("/")
         self.token = None
 
