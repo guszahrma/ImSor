@@ -2,8 +2,11 @@
 
 from credentials import username, password
 
-# Central Web Service URL
-server_url = "http://localhost:8000"
+# Central Web Service URLs per environment
+server_urls = {
+    "dev":  "http://localhost:8000",
+    "prod": "http://localhost:8001",
+}
 
 # YOLO model to use (downloaded automatically on first run)
 # Options: "yolov8n.pt" (fastest), "yolov8s.pt" (balanced), "yolov8m.pt" (more accurate)

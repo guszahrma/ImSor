@@ -7,10 +7,18 @@ import re
 import subprocess
 import signal
 import sys
+from pathlib import PureWindowsPath
 
 from api_client import ApiClient
 from detector import detect_people
-from config import image_extensions
+from config import image_extensions, server_urls
+
+
+def normalize_path(path: str) -> str:
+    """Normalize a Windows path to forward-slash UNC format for DB lookup.
+    e.g. \\\\server\\share\\folder\\file.jpg -> //server/share/folder/file.jpg
+    """
+    return str(PureWindowsPath(path)).replace("\\", "/")
 
 
 # --- Graceful stop / pause state ---
@@ -136,8 +144,8 @@ def _annotate_folder(folder: str, annotation_type: str, client: ApiClient) -> di
         print(f"  [{i}/{len(local_files)}] {file_path} ... ", end="", flush=True)
 
         try:
-            # Look up image in central service
-            image_record = client.get_image_by_path(file_path)
+            # Look up image in central service (normalize path to forward-slash UNC format)
+            image_record = client.get_image_by_path(normalize_path(file_path))
             if not image_record:
                 print("not registered (skipped)")
                 skipped_count += 1
@@ -201,7 +209,12 @@ def main():
         "--host", default=platform.node(),
         help="Hostname hint for display (default: computer name)"
     )
+    parser.add_argument(
+        "--env", choices=["dev", "prod"], default="dev",
+        help="Target environment (default: dev)"
+    )
     args = parser.parse_args()
+    server_url = server_urls[args.env]
 
     path = args.path
     annotation_type = args.type
@@ -225,6 +238,7 @@ def main():
         folders = [path]
 
     print(f"ImSor Auto Annotator")
+    print(f"  Environment: {args.env} ({server_url})")
     print(f"  Path:       {path}")
     print(f"  Type:       {annotation_type}")
     print(f"  Target(s):  {len(folders)}")
@@ -232,7 +246,7 @@ def main():
 
     # Authenticate
     print("Logging in to central service...")
-    client = ApiClient()
+    client = ApiClient(server_url)
     try:
         client.login()
     except Exception as e:
