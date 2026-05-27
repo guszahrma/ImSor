@@ -5,176 +5,330 @@
     <title>ImSor — Annotations</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #1a1a2e;
             color: #e0e0e0;
-            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ── Person panel (full-height left column) ──────────────────────── */
+        #person-panel {
+            width: 440px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            padding: 12px 14px;
+            background: #252545;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #person-panel .hint { font-size: 0.85rem; color: #aaa; }
+        #person-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+        #person-list button { padding: 3px 8px; font-size: 0.8rem; background: #3a3a6a; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+        #person-list button .shortcut {
+            display: inline-block; background: #5a5aaa; color: #fff;
+            font-weight: bold; width: 15px; height: 15px; line-height: 15px;
+            text-align: center; border-radius: 2px; margin-right: 4px; font-size: 0.7rem;
+        }
+        #person-list button:hover { background: #5a5aaa; }
+        #new-person-row { display: flex; gap: 6px; align-items: center; }
+        #new-person-row input {
+            padding: 5px 10px; font-size: 0.85rem;
+            border: 1px solid #555; border-radius: 4px;
+            background: #1a1a2e; color: #e0e0e0; flex: 1; min-width: 0;
+        }
+        #new-person-row button { padding: 5px 12px; font-size: 0.85rem; flex-shrink: 0; }
+        #delete-box-btn { padding: 5px 14px; font-size: 0.85rem; width: 100%; }
+
+        /* ── Right side ──────────────────────────────────────────────────── */
+        #right-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* ── Top bar ─────────────────────────────────────────────────────── */
+        #topbar {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 0 50px;       /* keep clear of help-btn */
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+        }
+        #topbar-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            white-space: nowrap;
+            color: #ddd;
+        }
+        #site-nav { display: flex; gap: 14px; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+        #status {
+            position: absolute;
+            right: 50px;
+            color: #888;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        #box-mode-indicator {
+            position: absolute;
+            left: 10px;
+            font-size: 0.75rem;
+            color: #666;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* ── Buttons ─────────────────────────────────────────────────────── */
+        button {
+            padding: 7px 18px; font-size: 0.9rem;
+            border: none; border-radius: 4px; cursor: pointer;
+            background: #4a4a8a; color: #fff;
+        }
+        button:hover { background: #5a5aaa; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button.danger { background: #7a1f1f; }
+        button.danger:hover { background: #9a2f2f; }
+
+        /* ── Help button ─────────────────────────────────────────────────── */
+        #help-btn {
+            position: fixed; top: 7px; right: 14px;
+            background: #333; border: none; border-radius: 50%;
+            width: 32px; height: 32px;
+            font-size: 0.95rem; color: #ccc;
+            cursor: pointer; z-index: 99;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+        }
+        #help-btn:hover { background: #555; color: #fff; }
+
+        /* ── Help panel — slides in from the right ───────────────────────── */
+        #help-panel {
+            position: fixed;
+            top: 0; right: 0;
+            width: 320px; height: 100vh;
+            background: #1a1a2a; border-left: 1px solid #444;
+            padding: 2em 1.5em; overflow-y: auto;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        #help-panel.open { transform: translateX(0); }
+        #help-panel h2 { font-size: 1.1rem; margin-bottom: 1.2em; color: #ddd; }
+        #help-panel h3 {
+            font-size: 0.78rem; color: #777; text-transform: uppercase;
+            letter-spacing: 0.08em; margin: 1.2em 0 0.5em;
+        }
+        #help-panel h3:first-of-type { margin-top: 0; }
+        #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
+        #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        kbd {
+            display: inline-block;
+            background: #2a2a3a; border: 1px solid #555;
+            border-radius: 3px; padding: 1px 6px;
+            font-family: monospace; font-size: 0.78rem; color: #ccc;
+        }
+        #help-panel p { font-size: 0.83rem; color: #999; margin-top: 0.4em; line-height: 1.55; }
+        #help-close {
+            position: absolute; top: 0.8em; right: 1em;
+            background: none; border: none; color: #777;
+            font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1;
+        }
+        #help-close:hover { color: #fff; background: none; }
+
+        /* ── Loading area ────────────────────────────────────────────────── */
+        #loading-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: #aaa;
+        }
+
+        /* ── Main layout (image area) ────────────────────────────────────── */
+        #main-layout {
+            flex: 1;
+            overflow: hidden;
+            display: none;
+        }
+        #center-panel {
+            width: 100%;
+            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
-        }
-        h1 { margin-bottom: 10px; font-size: 1.4rem; }
-        #controls {
-            margin-bottom: 10px;
-            display: flex;
-            gap: 15px;
-        }
-        #status {
-            margin-bottom: 12px;
-            color: #aaa;
-            font-size: 0.9rem;
+            justify-content: center;
         }
         #filepath {
-            font-size: 0.8rem;
-            color: #ccc;
-            margin-bottom: 8px;
-            word-break: break-all;
-            text-align: center;
-            max-width: 90vw;
+            font-size: 0.72rem; color: #444; margin-bottom: 4px;
+            word-break: break-all; text-align: center; max-width: 90%;
         }
         #image-container {
             position: relative;
             display: inline-block;
+            cursor: crosshair;
         }
         #image-container img {
-            max-width: 90vw;
-            max-height: 70vh;
-            border: 2px solid #333;
-            border-radius: 4px;
-            display: block;
-            background: #111;
+            max-width: 100%;
+            max-height: calc(100vh - 54px);
+            border: 2px solid #333; border-radius: 4px;
+            display: block; background: #111;
+            pointer-events: none;
         }
+
+        /* ── Bbox visibility modes ──────────────────────────────────────── */
+        #image-container.boxes-none .bbox            { visibility: hidden; }
+        #image-container.boxes-selected .bbox:not(.selected) { visibility: hidden; }
+
+        /* ── Bboxes ──────────────────────────────────────────────────────── */
         .bbox {
             position: absolute;
             border: 2px solid #00ff88;
             background: rgba(0, 255, 136, 0.08);
-            cursor: pointer;
+            cursor: move;
         }
         .bbox:hover { background: rgba(0, 255, 136, 0.2); }
         .bbox.selected { border-color: #ffcc00; background: rgba(255, 204, 0, 0.15); }
         .bbox.named { border-color: #44aaff; }
+        .bbox.drawing { border-color: #fff; border-style: dashed; background: rgba(255,255,255,0.05); pointer-events: none; }
         .bbox-label {
-            position: absolute;
-            top: -20px;
-            left: 0;
-            background: #00ff88;
-            color: #000;
-            font-size: 0.65rem;
-            padding: 1px 5px;
-            border-radius: 2px;
-            white-space: nowrap;
+            position: absolute; top: -20px; left: 0;
+            background: #00ff88; color: #000;
+            font-size: 0.65rem; padding: 1px 5px;
+            border-radius: 2px; white-space: nowrap;
+            pointer-events: none;
         }
         .bbox.named .bbox-label { background: #44aaff; }
         .bbox.selected .bbox-label { background: #ffcc00; }
-        button {
-            padding: 10px 24px;
-            font-size: 1rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            background: #4a4a8a;
-            color: #fff;
+        .resize-handle {
+            position: absolute;
+            width: 9px; height: 9px;
+            background: #fff; border: 1px solid #555;
+            border-radius: 1px; z-index: 10;
         }
-        button:hover { background: #5a5aaa; }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
-        #loading {
-            font-size: 1.2rem;
-            color: #aaa;
-            margin-top: 40px;
-        }
-        /* Person assignment panel */
-        #person-panel {
-            margin-top: 14px;
-            padding: 12px 18px;
-            background: #252545;
-            border: 1px solid #444;
-            border-radius: 6px;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            min-width: 280px;
-        }
-        #person-panel .hint {
-            font-size: 0.85rem;
-            color: #aaa;
-        }
-        #person-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            justify-content: center;
-        }
-        #person-list button {
-            padding: 5px 14px;
-            font-size: 0.85rem;
-            background: #3a3a6a;
-        }
-        #person-list button .shortcut {
-            display: inline-block;
-            background: #5a5aaa;
-            color: #fff;
-            font-weight: bold;
-            width: 18px;
-            height: 18px;
-            line-height: 18px;
-            text-align: center;
-            border-radius: 3px;
-            margin-right: 6px;
-            font-size: 0.75rem;
-        }
-        #person-list button:hover { background: #5a5aaa; }
-        #new-person-row {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-        }
-        #new-person-row input {
-            padding: 5px 10px;
-            font-size: 0.85rem;
-            border: 1px solid #555;
-            border-radius: 4px;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            width: 160px;
-        }
-        #new-person-row button {
-            padding: 5px 12px;
-            font-size: 0.85rem;
-        }
+        .resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
     </style>
 </head>
 <body>
-    <div id="site-nav" style="align-self:flex-start;margin-bottom:1em;font-size:0.9em;">
-      <a href="/" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Home</a>
-      <a href="/duplicates" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Duplicates</a>
-      <a href="/users" id="nav-users" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Users</a>
-      <a href="/admin" id="nav-admin" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Admin</a>
-    </div>
-    <h1>ImSor — Annotations</h1>
-    <div id="controls" style="display:none;">
-        <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
-        <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
-    </div>
-    <div id="status"></div>
-    <div id="filepath"></div>
-    <div id="loading">Loading annotated images...</div>
-    <div id="image-container" style="display:none;">
-        <img id="main-img" alt="Annotated image">
-    </div>
+
+    <!-- ── Person panel (full-height left column) ─────────────────────────── -->
     <div id="person-panel">
-        <div class="hint">Click a bounding box to identify the person</div>
+        <div class="hint" id="panel-hint">Click a bounding box to identify the person</div>
         <div id="person-list"></div>
         <div id="new-person-row">
             <input id="new-person-name" type="text" placeholder="New person name">
             <button onclick="assignNewPerson()">Add</button>
         </div>
+        <button id="delete-box-btn" class="danger" onclick="deleteSelectedBox()" style="display:none;">
+            Delete box
+        </button>
     </div>
 
+    <!-- ── Right side ─────────────────────────────────────────────────────── -->
+    <div id="right-side">
+
+        <!-- Top bar: everything centered -->
+        <div id="topbar">
+            <div id="box-mode-indicator"></div>
+            <span id="topbar-title">ImSor — Annotations</span>
+            <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
+            <div id="site-nav">
+                <a href="/">Home</a>
+                <a href="/duplicates">Duplicates</a>
+                <a href="/users" id="nav-users" style="display:none">Users</a>
+                <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+            </div>
+            <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
+            <div id="status"></div>
+        </div>
+
+        <button id="help-btn" onclick="toggleHelp()" title="Help (H)">?</button>
+
+        <!-- Help panel (slides in from right) -->
+        <div id="help-panel">
+            <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+            <h2>Keyboard &amp; mouse guide</h2>
+
+            <h3>Navigation</h3>
+            <table><tbody>
+                <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+            </tbody></table>
+
+            <h3>Bounding boxes</h3>
+            <table><tbody>
+                <tr><td>Click box</td><td>Select it</td></tr>
+                <tr><td>Drag empty space</td><td>Draw a new box</td></tr>
+                <tr><td>Drag selected box</td><td>Move it</td></tr>
+                <tr><td>Drag corner handle</td><td>Resize it</td></tr>
+                <tr><td><kbd>Del</kbd> / <kbd>Backspace</kbd></td><td>Delete selected box</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Deselect</td></tr>
+            </tbody></table>
+
+            <h3>Naming a person</h3>
+            <table><tbody>
+                <tr><td><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></td><td>Assign 1st–10th name from recent list</td></tr>
+                <tr><td><kbd>Enter</kbd></td><td>Focus name input — type a new name, press Enter to assign</td></tr>
+                <tr><td>Click name button</td><td>Assign that name to the selected box</td></tr>
+            </tbody></table>
+
+            <h3>Visibility</h3>
+            <table><tbody>
+                <tr><td><kbd>B</kbd></td><td>Cycle boxes: all → selected only → hidden</td></tr>
+            </tbody></table>
+
+            <h3>Queue</h3>
+            <p>
+                Only images with at least one unnamed detection appear here.
+                Fully unworked images come first; partially named follow.
+                When the last unnamed box is named, the page advances automatically.
+            </p>
+
+            <h3>This panel</h3>
+            <table><tbody>
+                <tr><td><kbd>H</kbd></td><td>Toggle this panel</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Close this panel</td></tr>
+            </tbody></table>
+        </div>
+
+        <!-- Loading state -->
+        <div id="loading-area">
+            <div id="loading">Loading...</div>
+        </div>
+
+        <!-- Main content (shown after load) -->
+        <div id="main-layout">
+            <div id="center-panel">
+                <div id="filepath"></div>
+                <div id="image-container" style="display:none;">
+                    <img id="main-img" alt="Annotated image">
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /#right-side -->
+
     <script>
-    // Nav: show superuser-only links
+    // ── Nav ────────────────────────────────────────────────────────────────
     fetch('/api/current_user').then(r => r.json()).then(data => {
         if (data.logged_in && data.user?.role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
@@ -182,238 +336,569 @@
         }
     }).catch(() => {});
 
-        let entries = [];
-        let knownPeople = [];
-        let currentIndex = 0;
-        let selectedAnn = null;  // annotation object currently selected
+    // ── State ──────────────────────────────────────────────────────────────
+    let queue = [];
+    let currentIndex = 0;
+    let knownPeople = [];
+    let selectedAnn = null;
+    let currentAnnotations = [];
+    let currentImage = null;
+    const imageCache = new Map();
 
-        async function loadData() {
-            try {
-                const [imgResp, peopleResp] = await Promise.all([
-                    fetch("/api/annotated-images"),
-                    fetch("/api/known-people"),
-                ]);
-                if (!imgResp.ok) throw new Error(`HTTP ${imgResp.status}`);
-                if (!peopleResp.ok) throw new Error(`HTTP ${peopleResp.status}`);
-                entries = await imgResp.json();
-                knownPeople = await peopleResp.json();
-            } catch (err) {
-                document.getElementById("loading").textContent =
-                    "Error loading annotations: " + err.message;
-                return;
-            }
+    let mode = null;
+    let scaleX = 1, scaleY = 1;
+    let boxVisibility = 'all'; // 'all' | 'selected' | 'none'
 
-            document.getElementById("loading").style.display = "none";
+    function setBoxVisibility(mode) {
+        boxVisibility = mode;
+        container.classList.remove('boxes-none', 'boxes-selected');
+        if (mode === 'none')     container.classList.add('boxes-none');
+        if (mode === 'selected') container.classList.add('boxes-selected');
+        const labels = { all: '', selected: 'boxes: selected only', none: 'boxes: hidden' };
+        document.getElementById('box-mode-indicator').textContent = labels[mode];
+    }
 
-            if (entries.length === 0) {
-                document.getElementById("status").textContent =
-                    "No annotated images found.";
-                return;
-            }
+    function cycleBoxVisibility() {
+        const modes = ['all', 'selected', 'none'];
+        setBoxVisibility(modes[(modes.indexOf(boxVisibility) + 1) % 3]);
+    }
+    let drawState = null;
+    let dragState = null;
+    let resizeState = null;
+    let previewEl = null;
 
-            document.getElementById("controls").style.display = "flex";
-            document.getElementById("image-container").style.display = "inline-block";
-            document.getElementById("person-panel").style.display = "flex";
-            showImage();
+    const container = document.getElementById('image-container');
+    const img = document.getElementById('main-img');
+
+    // ── Data fetching ──────────────────────────────────────────────────────
+
+    async function fetchImageData(imageId) {
+        if (imageCache.has(imageId)) return imageCache.get(imageId);
+        const resp = await fetch(`/api/annotated-images/${imageId}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        imageCache.set(imageId, data);
+        return data;
+    }
+
+    function prefetchNext() {
+        if (currentIndex + 1 < queue.length) {
+            fetchImageData(queue[currentIndex + 1].image_id).catch(() => {});
+        }
+    }
+
+    async function loadData() {
+        try {
+            const [queueResp, peopleResp] = await Promise.all([
+                fetch('/api/annotated-images/queue'),
+                fetch('/api/known-people'),
+            ]);
+            if (!queueResp.ok) throw new Error(`Queue: HTTP ${queueResp.status}`);
+            if (!peopleResp.ok) throw new Error(`People: HTTP ${peopleResp.status}`);
+            queue = await queueResp.json();
+            knownPeople = await peopleResp.json();
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Error loading: ' + err.message;
+            return;
         }
 
-        function showImage() {
-            selectedAnn = null;
-            const entry = entries[currentIndex];
-            const image = entry.image;
-            const annotations = entry.annotations;
+        document.getElementById('loading-area').style.display = 'none';
 
-            document.getElementById("status").textContent =
-                `Image ${currentIndex + 1} of ${entries.length} — ${annotations.length} person(s) detected`;
-            document.getElementById("filepath").textContent = image.file_path;
-
-            const img = document.getElementById("main-img");
-            const container = document.getElementById("image-container");
-
-            // Remove old bounding boxes
-            container.querySelectorAll(".bbox").forEach(el => el.remove());
-
-            img.onload = function () {
-                const scaleX = img.clientWidth / (image.image_width || img.naturalWidth);
-                const scaleY = img.clientHeight / (image.image_height || img.naturalHeight);
-
-                for (const ann of annotations) {
-                    const val = JSON.parse(ann.value);
-                    const box = document.createElement("div");
-                    box.className = "bbox" + (val.person_name ? " named" : "");
-                    box.style.left = (val.x * scaleX) + "px";
-                    box.style.top = (val.y * scaleY) + "px";
-                    box.style.width = (val.width * scaleX) + "px";
-                    box.style.height = (val.height * scaleY) + "px";
-                    box.dataset.annId = ann.id;
-
-                    const label = document.createElement("div");
-                    label.className = "bbox-label";
-                    if (val.person_name) {
-                        label.textContent = val.person_name;
-                    } else {
-                        label.textContent = `person ${(val.confidence * 100).toFixed(0)}%`;
-                    }
-                    box.appendChild(label);
-
-                    box.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        selectBox(ann, box);
-                    });
-
-                    container.appendChild(box);
-                }
-
-                // Auto-select the first unnamed box, or first box if all named
-                const boxes = container.querySelectorAll(".bbox");
-                if (boxes.length > 0) {
-                    let target = null;
-                    let targetAnn = null;
-                    for (const ann of annotations) {
-                        const val = JSON.parse(ann.value);
-                        if (!val.person_name) {
-                            target = container.querySelector(`.bbox[data-ann-id="${ann.id}"]`);
-                            targetAnn = ann;
-                            break;
-                        }
-                    }
-                    if (!target) {
-                        target = boxes[0];
-                        targetAnn = annotations[0];
-                    }
-                    selectBox(targetAnn, target);
-                }
-            };
-
-            img.src = `/serve/${image.id}`;
-            renderPeopleList();
-
-            document.getElementById("btn-prev").disabled = currentIndex === 0;
-            document.getElementById("btn-next").disabled = currentIndex === entries.length - 1;
+        if (queue.length === 0) {
+            document.getElementById('loading-area').style.display = 'flex';
+            document.getElementById('loading').textContent =
+                'All person detections have been named. Nothing left to annotate.';
+            return;
         }
 
-        function selectBox(ann, boxEl) {
-            // Deselect previous
-            document.querySelectorAll(".bbox.selected").forEach(el => el.classList.remove("selected"));
-            boxEl.classList.add("selected");
-            selectedAnn = ann;
-            renderPeopleList();
+        document.getElementById('main-layout').style.display = 'block';
+        document.getElementById('image-container').style.display = 'inline-block';
+        updateStatus();
+        await showImage(0);
+    }
+
+    // ── Display ────────────────────────────────────────────────────────────
+
+    function updateStatus() {
+        if (queue.length === 0) return;
+        const item = queue[currentIndex];
+        document.getElementById('status').textContent =
+            `Image ${currentIndex + 1} of ${queue.length} · ${item.unnamed_count} unnamed`;
+        document.getElementById('btn-prev').disabled = currentIndex === 0;
+        document.getElementById('btn-next').disabled = currentIndex === queue.length - 1;
+    }
+
+    async function showImage(index) {
+        currentIndex = index;
+        selectedAnn = null;
+        updateStatus();
+
+        const item = queue[index];
+        let data;
+        try {
+            data = await fetchImageData(item.image_id);
+        } catch (err) {
+            document.getElementById('status').textContent = 'Error loading image: ' + err.message;
+            return;
         }
 
-        function renderPeopleList() {
-            const list = document.getElementById("person-list");
-            list.innerHTML = "";
-            for (let i = 0; i < knownPeople.length; i++) {
-                const name = knownPeople[i];
-                const btn = document.createElement("button");
-                if (i < 10) {
-                    const shortcut = document.createElement("span");
-                    shortcut.className = "shortcut";
-                    shortcut.textContent = (i + 1) % 10;  // 1-9, then 0
-                    btn.appendChild(shortcut);
-                }
-                btn.appendChild(document.createTextNode(name));
-                btn.addEventListener("click", () => assignPerson(name));
-                list.appendChild(btn);
+        currentImage = data.image;
+        currentAnnotations = data.annotations;
+
+        document.getElementById('filepath').textContent = currentImage.file_path;
+
+        img.onload = function () {
+            scaleX = img.clientWidth  / (currentImage.image_width  || img.naturalWidth);
+            scaleY = img.clientHeight / (currentImage.image_height || img.naturalHeight);
+            renderBoxes();
+            autoSelectFirstUnnamed();
+        };
+        img.src = `/serve/${currentImage.id}`;
+
+        renderPeopleList();
+        prefetchNext();
+    }
+
+    function renderBoxes() {
+        container.querySelectorAll('.bbox').forEach(el => el.remove());
+        for (const ann of currentAnnotations) {
+            addBoxElement(ann);
+        }
+    }
+
+    function addBoxElement(ann) {
+        const val = JSON.parse(ann.value);
+        const box = document.createElement('div');
+        box.className = 'bbox' + (val.person_name ? ' named' : '');
+        if (selectedAnn && ann.id === selectedAnn.id) box.classList.add('selected');
+        box.style.left   = (val.x      * scaleX) + 'px';
+        box.style.top    = (val.y      * scaleY) + 'px';
+        box.style.width  = (val.width  * scaleX) + 'px';
+        box.style.height = (val.height * scaleY) + 'px';
+        box.dataset.annId = ann.id;
+
+        const label = document.createElement('div');
+        label.className = 'bbox-label';
+        label.textContent = val.person_name
+            ? val.person_name
+            : `person ${((val.confidence ?? 1) * 100).toFixed(0)}%`;
+        box.appendChild(label);
+
+        if (selectedAnn && ann.id === selectedAnn.id) addResizeHandles(box);
+        container.appendChild(box);
+        return box;
+    }
+
+    function addResizeHandles(boxEl) {
+        for (const pos of ['nw', 'ne', 'sw', 'se']) {
+            const h = document.createElement('div');
+            h.className = `resize-handle resize-${pos}`;
+            h.dataset.handle = pos;
+            boxEl.appendChild(h);
+        }
+    }
+
+    function autoSelectFirstUnnamed() {
+        const first = currentAnnotations.find(a => !JSON.parse(a.value).person_name)
+            || currentAnnotations[0];
+        if (first) {
+            const el = container.querySelector(`.bbox[data-ann-id="${first.id}"]`);
+            if (el) selectBox(first, el);
+        }
+    }
+
+    function selectBox(ann, boxEl) {
+        container.querySelectorAll('.bbox.selected').forEach(el => {
+            el.classList.remove('selected');
+            el.querySelectorAll('.resize-handle').forEach(h => h.remove());
+        });
+        boxEl.classList.add('selected');
+        addResizeHandles(boxEl);
+        selectedAnn = ann;
+        renderPeopleList();
+        document.getElementById('delete-box-btn').style.display = '';
+    }
+
+    function deselectAll() {
+        container.querySelectorAll('.bbox.selected').forEach(el => {
+            el.classList.remove('selected');
+            el.querySelectorAll('.resize-handle').forEach(h => h.remove());
+        });
+        selectedAnn = null;
+        document.getElementById('delete-box-btn').style.display = 'none';
+        renderPeopleList();
+    }
+
+    function renderPeopleList() {
+        const list = document.getElementById('person-list');
+        list.innerHTML = '';
+        document.getElementById('panel-hint').textContent = selectedAnn
+            ? 'Assign a name to the selected box:'
+            : 'Click a bounding box to identify the person';
+        for (let i = 0; i < knownPeople.length; i++) {
+            const name = knownPeople[i];
+            const btn = document.createElement('button');
+            if (i < 10) {
+                const s = document.createElement('span');
+                s.className = 'shortcut';
+                s.textContent = (i + 1) % 10;
+                btn.appendChild(s);
+            }
+            btn.appendChild(document.createTextNode(name));
+            btn.addEventListener('click', () => assignPerson(name));
+            list.appendChild(btn);
+        }
+    }
+
+    // ── Mouse interaction ──────────────────────────────────────────────────
+
+    container.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+
+        const handleEl = e.target.closest('.resize-handle');
+        const bboxEl   = e.target.closest('.bbox');
+
+        if (handleEl) {
+            startResize(handleEl, bboxEl, e);
+        } else if (bboxEl) {
+            const ann = currentAnnotations.find(a => a.id === parseInt(bboxEl.dataset.annId));
+            if (ann) {
+                selectBox(ann, bboxEl);
+                startDrag(ann, bboxEl, e);
+            }
+        } else {
+            deselectAll();
+            startDraw(e);
+        }
+        e.preventDefault();
+    });
+
+    function startDrag(ann, boxEl, e) {
+        mode = 'dragging';
+        const val = JSON.parse(ann.value);
+        dragState = {
+            ann, boxEl,
+            startMouseX: e.clientX, startMouseY: e.clientY,
+            origX: val.x, origY: val.y,
+        };
+    }
+
+    function startResize(handleEl, boxEl, e) {
+        mode = 'resizing';
+        const ann = currentAnnotations.find(a => a.id === parseInt(boxEl.dataset.annId));
+        if (!ann) return;
+        const val = JSON.parse(ann.value);
+        resizeState = {
+            ann, boxEl,
+            handle: handleEl.dataset.handle,
+            startMouseX: e.clientX, startMouseY: e.clientY,
+            origX: val.x, origY: val.y, origW: val.width, origH: val.height,
+            curX: val.x, curY: val.y, curW: val.width, curH: val.height,
+        };
+    }
+
+    function startDraw(e) {
+        const rect = img.getBoundingClientRect();
+        const dx = e.clientX - rect.left;
+        const dy = e.clientY - rect.top;
+        drawState = {
+            startDispX: dx, startDispY: dy,
+            startStoredX: dx / scaleX, startStoredY: dy / scaleY,
+        };
+        previewEl = document.createElement('div');
+        previewEl.className = 'bbox drawing';
+        previewEl.style.cssText = `left:${dx}px;top:${dy}px;width:0;height:0;`;
+        container.appendChild(previewEl);
+        mode = 'drawing';
+    }
+
+    document.addEventListener('mousemove', e => {
+        if (mode === 'dragging') {
+            const ds = dragState;
+            const newX = Math.max(0, ds.origX + (e.clientX - ds.startMouseX) / scaleX);
+            const newY = Math.max(0, ds.origY + (e.clientY - ds.startMouseY) / scaleY);
+            ds.boxEl.style.left = (newX * scaleX) + 'px';
+            ds.boxEl.style.top  = (newY * scaleY) + 'px';
+            ds.curX = newX; ds.curY = newY;
+
+        } else if (mode === 'resizing') {
+            const rs = resizeState;
+            const dx = (e.clientX - rs.startMouseX) / scaleX;
+            const dy = (e.clientY - rs.startMouseY) / scaleY;
+            const minSz = 10 / Math.min(scaleX, scaleY);
+            let {origX: x, origY: y, origW: w, origH: h} = rs;
+
+            if (rs.handle.includes('e')) { w = Math.max(minSz, w + dx); }
+            if (rs.handle.includes('s')) { h = Math.max(minSz, h + dy); }
+            if (rs.handle.includes('w')) {
+                const nx = Math.min(x + dx, x + w - minSz);
+                w = w - (nx - x); x = nx;
+            }
+            if (rs.handle.includes('n')) {
+                const ny = Math.min(y + dy, y + h - minSz);
+                h = h - (ny - y); y = ny;
+            }
+
+            rs.boxEl.style.left   = (x * scaleX) + 'px';
+            rs.boxEl.style.top    = (y * scaleY) + 'px';
+            rs.boxEl.style.width  = (w * scaleX) + 'px';
+            rs.boxEl.style.height = (h * scaleY) + 'px';
+            rs.curX = x; rs.curY = y; rs.curW = w; rs.curH = h;
+
+        } else if (mode === 'drawing' && drawState) {
+            const rect = img.getBoundingClientRect();
+            const ex = Math.max(0, Math.min(e.clientX - rect.left, img.clientWidth));
+            const ey = Math.max(0, Math.min(e.clientY - rect.top,  img.clientHeight));
+            const left   = Math.min(ex, drawState.startDispX);
+            const top    = Math.min(ey, drawState.startDispY);
+            const width  = Math.abs(ex - drawState.startDispX);
+            const height = Math.abs(ey - drawState.startDispY);
+            previewEl.style.left = left + 'px'; previewEl.style.top  = top + 'px';
+            previewEl.style.width = width + 'px'; previewEl.style.height = height + 'px';
+            drawState.endDispX = ex; drawState.endDispY = ey;
+        }
+    });
+
+    document.addEventListener('mouseup', async e => {
+        if (mode === 'dragging') {
+            const ds = dragState;
+            mode = null; dragState = null;
+            const val = JSON.parse(ds.ann.value);
+            val.x = ds.curX ?? ds.origX;
+            val.y = ds.curY ?? ds.origY;
+            await saveAnnotationGeometry(ds.ann, val);
+
+        } else if (mode === 'resizing') {
+            const rs = resizeState;
+            mode = null; resizeState = null;
+            const val = JSON.parse(rs.ann.value);
+            val.x = rs.curX; val.y = rs.curY; val.width = rs.curW; val.height = rs.curH;
+            await saveAnnotationGeometry(rs.ann, val);
+
+        } else if (mode === 'drawing') {
+            mode = null;
+            if (previewEl) { previewEl.remove(); previewEl = null; }
+            const ds = drawState;
+            drawState = null;
+            if (!ds) return;
+
+            const rect = img.getBoundingClientRect();
+            const ex = Math.max(0, Math.min(e.clientX - rect.left, img.clientWidth));
+            const ey = Math.max(0, Math.min(e.clientY - rect.top,  img.clientHeight));
+            const left   = Math.min(ex, ds.startDispX) / scaleX;
+            const top    = Math.min(ey, ds.startDispY) / scaleY;
+            const width  = Math.abs(ex - ds.startDispX) / scaleX;
+            const height = Math.abs(ey - ds.startDispY) / scaleY;
+
+            if (width > 5 && height > 5) {
+                await createNewBox(left, top, width, height);
             }
         }
+    });
 
-        async function assignPerson(name) {
-            if (!selectedAnn) return;
-            const val = JSON.parse(selectedAnn.value);
-            val.person_name = name;
-            const newValue = JSON.stringify(val);
+    // ── CRUD ───────────────────────────────────────────────────────────────
 
-            try {
-                await fetch(`/api/annotations/${selectedAnn.id}`, {
-                    method: "PATCH",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({value: newValue}),
-                });
-            } catch (err) {
-                alert("Error saving: " + err.message);
-                return;
-            }
+    async function saveAnnotationGeometry(ann, val) {
+        const newValue = JSON.stringify(val);
+        try {
+            await fetch(`/api/annotations/${ann.id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({value: newValue}),
+            });
+            ann.value = newValue;
+            imageCache.delete(currentImage.id);
+        } catch (err) {
+            alert('Error saving position: ' + err.message);
+        }
+    }
 
-            // Update local data
-            selectedAnn.value = newValue;
-            // Move name to front of list (most recently used)
-            const idx = knownPeople.indexOf(name);
+    async function createNewBox(x, y, width, height) {
+        const value = JSON.stringify({x, y, width, height, confidence: 1.0, person_name: null});
+        let ann;
+        try {
+            const resp = await fetch('/api/annotations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image_id: currentImage.id, annotation_type: 'person_bbox', value}),
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            ann = await resp.json();
+        } catch (err) {
+            alert('Error creating box: ' + err.message);
+            return;
+        }
+
+        currentAnnotations.push(ann);
+        imageCache.delete(currentImage.id);
+
+        const item = queue[currentIndex];
+        item.unnamed_count++;
+        updateStatus();
+
+        const boxEl = addBoxElement(ann);
+        selectBox(ann, boxEl);
+        if (boxVisibility !== 'all') setBoxVisibility('selected');
+        renderPeopleList();
+    }
+
+    async function deleteSelectedBox() {
+        if (!selectedAnn) return;
+        const ann = selectedAnn;
+        const val = JSON.parse(ann.value);
+        const wasUnnamed = !val.person_name;
+
+        try {
+            const resp = await fetch(`/api/annotations/${ann.id}`, {method: 'DELETE'});
+            if (!resp.ok) throw new Error(await resp.text());
+        } catch (err) {
+            alert('Error deleting box: ' + err.message);
+            return;
+        }
+
+        selectedAnn = null;
+        currentAnnotations = currentAnnotations.filter(a => a.id !== ann.id);
+        imageCache.delete(currentImage.id);
+
+        const item = queue[currentIndex];
+        if (wasUnnamed) item.unnamed_count--;
+        else item.named_count--;
+
+        if (item.unnamed_count === 0 || currentAnnotations.length === 0) {
+            queue.splice(currentIndex, 1);
+            if (queue.length === 0) { showDone(); return; }
+            if (currentIndex >= queue.length) currentIndex--;
+            await showImage(currentIndex);
+        } else {
+            renderBoxes();
+            document.getElementById('delete-box-btn').style.display = 'none';
+            updateStatus();
+        }
+    }
+
+    async function assignPerson(name) {
+        if (!selectedAnn) return;
+        const val = JSON.parse(selectedAnn.value);
+        const wasUnnamed = !val.person_name;
+        val.person_name = name;
+        const newValue = JSON.stringify(val);
+
+        try {
+            await fetch(`/api/annotations/${selectedAnn.id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({value: newValue}),
+            });
+        } catch (err) {
+            alert('Error saving: ' + err.message);
+            return;
+        }
+
+        selectedAnn.value = newValue;
+        imageCache.delete(currentImage.id);
+
+        const idx = knownPeople.indexOf(name);
+        if (idx !== 0) {
             if (idx > 0) knownPeople.splice(idx, 1);
-            if (idx !== 0) knownPeople.unshift(name);
+            knownPeople.unshift(name);
+        }
+
+        const item = queue[currentIndex];
+        if (wasUnnamed) { item.unnamed_count--; item.named_count++; }
+
+        if (item.unnamed_count === 0) {
+            queue.splice(currentIndex, 1);
+            if (queue.length === 0) { showDone(); return; }
+            if (currentIndex >= queue.length) currentIndex--;
+            await showImage(currentIndex);
+        } else {
             selectedAnn = null;
-            showImage();
-            document.body.focus();
+            renderBoxes();
+            autoSelectFirstUnnamed();
+            updateStatus();
         }
 
-        async function assignNewPerson() {
-            const input = document.getElementById("new-person-name");
-            const name = input.value.trim();
-            if (!name || !selectedAnn) return;
-            input.value = "";
-            input.blur();
-            await assignPerson(name);
+        document.body.focus();
+    }
+
+    async function assignNewPerson() {
+        const input = document.getElementById('new-person-name');
+        const name = input.value.trim();
+        if (!name || !selectedAnn) return;
+        input.value = '';
+        input.blur();
+        await assignPerson(name);
+    }
+
+    function showDone() {
+        document.getElementById('main-layout').style.display = 'none';
+        document.getElementById('loading-area').style.display = 'flex';
+        document.getElementById('loading').textContent =
+            'All person detections have been named. Nothing left to annotate.';
+    }
+
+    // ── Navigation ─────────────────────────────────────────────────────────
+
+    function navigate(delta) {
+        const newIndex = currentIndex + delta;
+        if (newIndex < 0 || newIndex >= queue.length) return;
+        showImage(newIndex);
+    }
+
+    function selectNextBox() {
+        if (!selectedAnn || currentAnnotations.length < 2) return;
+        const curIdx = currentAnnotations.findIndex(a => a.id === selectedAnn.id);
+        const nextAnn = currentAnnotations[(curIdx + 1) % currentAnnotations.length];
+        const el = container.querySelector(`.bbox[data-ann-id="${nextAnn.id}"]`);
+        if (el) selectBox(nextAnn, el);
+    }
+
+    // ── Keyboard ───────────────────────────────────────────────────────────
+
+    document.getElementById('new-person-name').addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const input = document.getElementById('new-person-name');
+        input.blur();
+        if (input.value.trim()) assignNewPerson();
+        else selectNextBox();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'ArrowLeft')  { navigate(-1); return; }
+        if (e.key === 'ArrowRight') { navigate(1);  return; }
+        if (e.key === 'Escape') {
+            if (helpIsOpen()) { closeHelp(); return; }
+            deselectAll(); return;
         }
-
-        // Enter in the input: if text, submit as new person; if empty, move to next box
-        document.getElementById("new-person-name").addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                const input = document.getElementById("new-person-name");
-                input.blur();
-                if (input.value.trim()) {
-                    assignNewPerson();
-                } else {
-                    selectNextBox();
-                }
-            }
-        });
-
-        function navigate(delta) {
-            currentIndex += delta;
-            if (currentIndex < 0) currentIndex = 0;
-            if (currentIndex >= entries.length) currentIndex = entries.length - 1;
-            showImage();
+        if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
+        if (e.key === 'b' || e.key === 'B') { cycleBoxVisibility(); return; }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnn) {
+            e.preventDefault();
+            deleteSelectedBox();
+            return;
         }
-
-        function selectNextBox() {
-            if (!selectedAnn) return;
-            const entry = entries[currentIndex];
-            const annotations = entry.annotations;
-            const curIdx = annotations.findIndex(a => a.id === selectedAnn.id);
-            const nextIdx = (curIdx + 1) % annotations.length;
-            const nextAnn = annotations[nextIdx];
-            const container = document.getElementById("image-container");
-            const nextBox = container.querySelector(`.bbox[data-ann-id="${nextAnn.id}"]`);
-            if (nextBox) selectBox(nextAnn, nextBox);
+        if (e.key === 'Enter' && selectedAnn) {
+            e.preventDefault();
+            document.getElementById('new-person-name').focus();
+            return;
         }
+        if (selectedAnn && e.key >= '0' && e.key <= '9') {
+            const idx = e.key === '0' ? 9 : parseInt(e.key) - 1;
+            if (idx < knownPeople.length) assignPerson(knownPeople[idx]);
+        }
+    });
 
-        document.addEventListener("keydown", (e) => {
-            // Don't handle shortcuts if typing in the input
-            if (e.target.tagName === "INPUT") return;
-            if (e.key === "ArrowLeft") navigate(-1);
-            if (e.key === "ArrowRight") navigate(1);
+    // ── Help panel ─────────────────────────────────────────────────────────
 
-            // Enter: focus the person name input
-            if (e.key === "Enter" && selectedAnn) {
-                e.preventDefault();
-                document.getElementById("new-person-name").focus();
-                return;
-            }
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
+    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+    function helpIsOpen() { return document.getElementById('help-panel').classList.contains('open'); }
 
-            // 1-9 and 0 to assign people (1=first, 2=second, ..., 0=tenth)
-            if (selectedAnn && e.key >= "0" && e.key <= "9") {
-                const idx = e.key === "0" ? 9 : parseInt(e.key) - 1;
-                if (idx < knownPeople.length) {
-                    assignPerson(knownPeople[idx]);
-                }
-            }
-        });
-
-        loadData();
-    </script>
-
-        loadData();
+    // ── Boot ───────────────────────────────────────────────────────────────
+    loadData();
     </script>
 </body>
 </html>
