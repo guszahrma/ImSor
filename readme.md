@@ -84,30 +84,53 @@ Standalone utilities used alongside the main system.
 2. **Install Git** (if not already installed)
    - Download from <https://git-scm.com/downloads>
 
+### Environments
+
+The system supports two separate environments, each with its own database and ports:
+
+| Environment | Web UI                          | API / Swagger                        | DB port |
+|-------------|---------------------------------|--------------------------------------|---------|
+| Dev         | <http://localhost:8000>         | <http://localhost:8000/docs>         | 5432    |
+| Prod        | <http://localhost:8001>         | <http://localhost:8001/docs>         | 5433    |
+
+Configuration lives in two `.env` files in the project root:
+
+- `.env.dev` — committed to git, safe defaults for local development.
+- `.env.prod` — **not** committed to git (gitignored). Contains the real production password. Edit `DB_PASSWORD` before first use.
+
 ### Running the Central Web Service + Database
 
 The system uses two Docker containers managed by docker-compose:
 
-| Container    | Role                        |
-|--------------|-----------------------------|
-| `imsor-db`   | PostgreSQL 16 database      |
-| `imsor-web`  | FastAPI web service (Python) |
+| Container         | Role                         |
+|-------------------|------------------------------|
+| `imsor-dev-db`    | PostgreSQL 16 database (dev) |
+| `imsor-dev-web`   | FastAPI web service (dev)    |
+| `imsor-prod-db`   | PostgreSQL 16 database (prod)|
+| `imsor-prod-web`  | FastAPI web service (prod)   |
 
 Steps:
 
 1. Open a terminal and navigate to the ImSor project root directory.
-2. Run:
-   ```
-   docker compose up --build
-   ```
+2. Run the desired environment:
+   - **Dev:**
+     ```
+     docker compose --env-file .env.dev up --build
+     ```
+   - **Prod:**
+     ```
+     docker compose --env-file .env.prod up --build
+     ```
    This will:
    - Build the FastAPI web service container from `central-service/Dockerfile`.
    - Pull the PostgreSQL 16 image (first time only).
    - Start both containers.
 3. Wait until you see log output indicating the web service is running.
 4. Open a browser and go to:
-   - <http://localhost:8000> — should return a JSON status message.
-   - <http://localhost:8000/docs> — interactive API documentation (Swagger UI).
+   - Dev: <http://localhost:8000> — should return a JSON status message.
+   - Dev: <http://localhost:8000/docs> — interactive API documentation (Swagger UI).
+   - Prod: <http://localhost:8001> — should return a JSON status message.
+   - Prod: <http://localhost:8001/docs> — interactive API documentation (Swagger UI).
 
 ### First-Time Setup (Creating the Admin Account)
 
@@ -155,18 +178,21 @@ Only `admin` users can create new users via `POST /users/`.
 - Press `Ctrl+C` in the terminal where docker compose is running, or
 - Run:
   ```
-  docker compose down
+  docker compose --env-file .env.dev down
   ```
+  (replace `.env.dev` with `.env.prod` for the production environment)
 
 ### Resetting the database
 
 To delete all data and start fresh:
 
 ```
-docker compose down -v
+docker compose --env-file .env.dev down -v
 ```
 
-The `-v` flag removes the persistent database volume.
+The `-v` flag removes the persistent database volume. Replace `.env.dev` with `.env.prod` to reset production instead.
+
+> ⚠️ **Warning:** Running `down -v` on prod will permanently delete all production data.
 
 ### Inspecting the database with DBeaver
 
@@ -178,6 +204,8 @@ browsing tables and running SQL queries.
 3. Select "PostgreSQL" and click Next.
 4. Enter the following connection settings:
 
+   **Dev:**
+
    | Setting  | Value                |
    |----------|----------------------|
    | Host     | `localhost`          |
@@ -185,6 +213,16 @@ browsing tables and running SQL queries.
    | Database | `imsor`              |
    | Username | `imsor`              |
    | Password | `imsor_dev_password` |
+
+   **Prod:**
+
+   | Setting  | Value                          |
+   |----------|--------------------------------|
+   | Host     | `localhost`                    |
+   | Port     | `5433`                         |
+   | Database | `imsor`                        |
+   | Username | `imsor`                        |
+   | Password | *(value from `.env.prod`)*     |
 
 5. Click "Test Connection" to verify, then click "Finish".
 6. Expand the connection in the left panel: `imsor > Schemas > public > Tables`

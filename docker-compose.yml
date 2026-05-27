@@ -1,16 +1,16 @@
 services:
   db:
     image: postgres:16
-    container_name: imsor-db
+    container_name: ${COMPOSE_PROJECT_NAME}-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: imsor
-      POSTGRES_PASSWORD: imsor_dev_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: imsor
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
-      - imsor_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U imsor -d imsor"]
       interval: 2s
@@ -19,15 +19,15 @@ services:
 
   web:
     build: ./central-service
-    container_name: imsor-web
+    container_name: ${COMPOSE_PROJECT_NAME}-web
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${WEB_PORT}:8000"
     environment:
-      DATABASE_URL: postgresql://imsor:imsor_dev_password@db:5432/imsor
+      DATABASE_URL: postgresql://imsor:${DB_PASSWORD}@db:5432/imsor
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
-  imsor_pgdata:
+  pgdata:
