@@ -312,26 +312,28 @@ def api_submit_cluster_vote():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/annotated-images")
-def annotated_images():
-    """Return images that have person_bbox annotations, with their annotations."""
-    all_annotations = api_client.get_all_annotations()
+@app.route("/api/annotated-images/queue")
+def annotated_images_queue():
+    """Return the bbox annotation queue (images with at least one unnamed person_bbox)."""
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        return jsonify(api_client.get_bbox_queue())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    # Group annotations by image_id, only person_bbox
-    by_image: dict[int, list[dict]] = {}
-    for ann in all_annotations:
-        if ann["annotation_type"] == "person_bbox":
-            by_image.setdefault(ann["image_id"], []).append(ann)
 
-    result = []
-    for image_id, anns in by_image.items():
-        try:
-            image = api_client.get_image(image_id)
-        except Exception:
-            continue
-        result.append({"image": image, "annotations": anns})
-
-    return jsonify(result)
+@app.route("/api/annotated-images/<int:image_id>")
+def annotated_image(image_id: int):
+    """Return image metadata + person_bbox annotations for a single image."""
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        return jsonify(api_client.get_bbox_image(image_id))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/known-people")
@@ -354,6 +356,36 @@ def known_people():
     # Sort by timestamp descending (most recent first)
     names = sorted(latest.keys(), key=lambda n: latest[n], reverse=True)
     return jsonify(names)
+
+
+@app.route("/api/annotations", methods=["POST"])
+def api_create_annotation():
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json()
+    try:
+        result = api_client.create_annotation(
+            image_id=body["image_id"],
+            user_id=user.get("id"),
+            annotation_type=body["annotation_type"],
+            value=body["value"],
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify(result)
+
+
+@app.route("/api/annotations/<int:annotation_id>", methods=["DELETE"])
+def api_delete_annotation(annotation_id: int):
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        result = api_client.delete_annotation(annotation_id)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify(result)
 
 
 @app.route("/api/annotations/<int:annotation_id>", methods=["PATCH"])

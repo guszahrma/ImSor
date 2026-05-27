@@ -81,6 +81,30 @@ def get_all_annotations() -> list[dict]:
     return _request("GET", f"{config.server_url}/annotations/").json()
 
 
+def create_annotation(image_id: int, user_id: int | None, annotation_type: str, value: str) -> dict:
+    return _request("POST", f"{config.server_url}/annotations/", json={
+        "image_id": image_id,
+        "user_id": user_id,
+        "annotation_type": annotation_type,
+        "value": value,
+        "source": "manual",
+    }).json()
+
+
+def delete_annotation(annotation_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/annotations/{annotation_id}").json()
+
+
+def get_bbox_queue() -> list[dict]:
+    """Return the bbox annotation queue: images with at least one unnamed person_bbox."""
+    return _request("GET", f"{config.server_url}/annotations/bbox-queue").json()
+
+
+def get_bbox_image(image_id: int) -> dict:
+    """Return image metadata + person_bbox annotations for a single image."""
+    return _request("GET", f"{config.server_url}/annotations/bbox-image/{image_id}").json()
+
+
 def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()
 
