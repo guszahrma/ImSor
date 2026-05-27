@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from .database import engine, Base
-from .routers import auth, setup, users, images, duplicates, annotations, sharing
+from .routers import auth, setup, users, images, duplicates, annotations, sharing, admin, communities
 
 Base.metadata.create_all(bind=engine)
 
@@ -14,6 +14,8 @@ app.include_router(images.router)
 app.include_router(duplicates.router)
 app.include_router(annotations.router)
 app.include_router(sharing.router)
+app.include_router(admin.router)
+app.include_router(communities.router)
 
 
 @app.get("/")

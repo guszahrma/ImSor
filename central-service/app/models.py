@@ -1,7 +1,7 @@
 import datetime
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, ForeignKey, Text,
-    UniqueConstraint,
+    UniqueConstraint, Boolean,
 )
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -15,10 +15,14 @@ class User(Base):
     display_name = Column(String(200))
     password_hash = Column(String(200), nullable=False)
     role = Column(String(20), nullable=False, default="basic-user")  # "superuser", "maintainer", "basic-user"
+    can_create_community = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     annotations = relationship("Annotation", back_populates="user")
     sharing_decisions = relationship("SharingPermission", back_populates="user")
+    cameras = relationship("Camera", back_populates="user", cascade="all, delete-orphan")
+    person_links = relationship("PersonUserLink", back_populates="user", cascade="all, delete-orphan")
+    created_communities = relationship("Community", back_populates="creator", cascade="all, delete-orphan")
 
 
 class Image(Base):
@@ -76,6 +80,84 @@ class Annotation(Base):
 
     image = relationship("Image", back_populates="annotations")
     user = relationship("User", back_populates="annotations")
+
+
+class Camera(Base):
+    __tablename__ = "cameras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    make = Column(String(200), nullable=False)
+    model = Column(String(200), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="cameras")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "make", "model", name="uq_camera_user_make_model"),
+    )
+
+
+class PersonUserLink(Base):
+    __tablename__ = "person_user_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    person_name = Column(String(200), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="person_links")
+
+    __table_args__ = (
+        UniqueConstraint("person_name", name="uq_person_name"),
+    )
+
+
+class Community(Base):
+    __tablename__ = "communities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    creator = relationship("User", back_populates="created_communities")
+    members = relationship("CommunityMember", back_populates="community", cascade="all, delete-orphan")
+    granters = relationship("CommunityGranter", back_populates="community", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("creator_id", "name", name="uq_community_creator_name"),
+    )
+
+
+class CommunityMember(Base):
+    __tablename__ = "community_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    community_id = Column(Integer, ForeignKey("communities.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    community = relationship("Community", back_populates="members")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("community_id", "user_id", name="uq_community_member"),
+    )
+
+
+class CommunityGranter(Base):
+    __tablename__ = "community_granters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    community_id = Column(Integer, ForeignKey("communities.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    community = relationship("Community", back_populates="granters")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("community_id", "user_id", name="uq_community_granter"),
+    )
 
 
 class SharingPermission(Base):

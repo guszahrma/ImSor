@@ -85,6 +85,64 @@ def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()
 
 
+# --- Admin ---
+
+def get_image_cameras() -> list[dict]:
+    """Return distinct (make, model) pairs from the image library."""
+    return _request("GET", f"{config.server_url}/admin/image-cameras").json()
+
+def get_cameras() -> list[dict]:
+    return _request("GET", f"{config.server_url}/admin/cameras").json()
+
+def create_camera(user_id: int, make: str, model: str) -> dict:
+    return _request("POST", f"{config.server_url}/admin/cameras",
+                    json={"user_id": user_id, "make": make, "model": model}).json()
+
+def delete_camera(camera_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/admin/cameras/{camera_id}").json()
+
+def get_person_names() -> list[str]:
+    return _request("GET", f"{config.server_url}/admin/person-names").json()
+
+def get_person_links() -> list[dict]:
+    return _request("GET", f"{config.server_url}/admin/person-links").json()
+
+def create_person_link(person_name: str, user_id: int) -> dict:
+    return _request("POST", f"{config.server_url}/admin/person-links",
+                    json={"person_name": person_name, "user_id": user_id}).json()
+
+def delete_person_link(link_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/admin/person-links/{link_id}").json()
+
+def set_can_create_community(user_id: int, value: bool) -> dict:
+    return _request("PATCH", f"{config.server_url}/admin/users/{user_id}/can-create-community",
+                    json={"value": value}).json()
+
+def get_communities() -> list[dict]:
+    return _request("GET", f"{config.server_url}/communities/").json()
+
+def create_community(creator_id: int, name: str) -> dict:
+    return _request("POST", f"{config.server_url}/communities/",
+                    json={"creator_id": creator_id, "name": name}).json()
+
+def delete_community(community_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/communities/{community_id}").json()
+
+def add_community_member(community_id: int, user_id: int) -> dict:
+    return _request("POST", f"{config.server_url}/communities/{community_id}/members",
+                    json={"user_id": user_id}).json()
+
+def remove_community_member(community_id: int, user_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/communities/{community_id}/members/{user_id}").json()
+
+def add_community_granter(community_id: int, user_id: int) -> dict:
+    return _request("POST", f"{config.server_url}/communities/{community_id}/granters",
+                    json={"user_id": user_id}).json()
+
+def remove_community_granter(community_id: int, user_id: int) -> dict:
+    return _request("DELETE", f"{config.server_url}/communities/{community_id}/granters/{user_id}").json()
+
+
 def update_annotation(annotation_id: int, value: str) -> dict:
     return _request("PATCH", f"{config.server_url}/annotations/{annotation_id}",
                      json={"value": value}).json()

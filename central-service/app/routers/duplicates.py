@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Annotation, DuplicatePair, Image, User
+from ..models import Annotation, Camera, DuplicatePair, Image, User
 from ..schemas import (
     ClusterOut, ClusterImageOut, ClusterVoteSubmit, DuplicateRoleVote,
     DuplicatePairCreate, DuplicatePairOut,
@@ -93,6 +93,16 @@ def list_clusters(
 
     groups = _union_find(pairs)  # root -> [image_ids]
 
+    # Determine which images the requesting user can access
+    requesting_user = db.query(User).filter(User.id == user_id).first()
+    is_superuser = requesting_user and requesting_user.role == "superuser"
+
+    if not is_superuser:
+        user_cameras = db.query(Camera).filter(Camera.user_id == user_id).all()
+        accessible_camera_pairs: set[tuple[str, str]] = {
+            (c.make, c.model) for c in user_cameras
+        }
+
     # Fetch all duplicate_role annotations in one query
     all_votes = db.query(Annotation).filter(
         Annotation.annotation_type == "duplicate_role"
@@ -113,7 +123,23 @@ def list_clusters(
 
     result = []
     for root, image_ids in groups.items():
-        # Aggregate annotation info for this cluster
+        # Filter to images this user can access
+        if is_superuser:
+            visible_ids = [img_id for img_id in image_ids if img_id in images_by_id]
+        else:
+            visible_ids = [
+                img_id for img_id in image_ids
+                if img_id in images_by_id and (
+                    images_by_id[img_id].camera_make,
+                    images_by_id[img_id].camera_model,
+                ) in accessible_camera_pairs
+            ]
+
+        if len(visible_ids) < 2:
+            continue  # not enough accessible images to make a meaningful vote
+
+        # Aggregate annotation info across the full cluster (all image_ids, not just visible)
+        # so annotator_count reflects global annotation state
         cluster_user_ids: set[int] = set()
         user_votes_for_cluster: list[DuplicateRoleVote] = []
 
@@ -134,12 +160,11 @@ def list_clusters(
 
         cluster_images = [
             ClusterImageOut.model_validate(images_by_id[img_id])
-            for img_id in sorted(image_ids)
-            if img_id in images_by_id
+            for img_id in sorted(visible_ids)
         ]
 
         result.append(ClusterOut(
-            cluster_id=min(image_ids),
+            cluster_id=min(image_ids),  # stable ID based on full cluster, not just visible slice
             images=cluster_images,
             annotator_count=annotator_count,
             current_user_voted=False,

@@ -15,6 +15,7 @@ class UserOut(BaseModel):
     username: str
     display_name: str | None
     role: str
+    can_create_community: bool = False
     created_at: datetime.datetime
     model_config = {"from_attributes": True}
 
@@ -138,6 +139,58 @@ class AnnotationOut(BaseModel):
 class AnnotationUpdate(BaseModel):
     value: str | None = None
     source: str | None = None
+
+
+# --- Admin: Cameras ---
+
+class CameraCreate(BaseModel):
+    user_id: int
+    make: str
+    model: str
+
+class CameraOut(BaseModel):
+    id: int
+    user_id: int
+    make: str
+    model: str
+    created_at: datetime.datetime
+    model_config = {"from_attributes": True}
+
+
+# --- Admin: Person-User Links ---
+
+class PersonUserLinkCreate(BaseModel):
+    person_name: str
+    user_id: int
+
+class PersonUserLinkOut(BaseModel):
+    id: int
+    person_name: str
+    user_id: int
+    created_at: datetime.datetime
+    model_config = {"from_attributes": True}
+
+
+# --- Communities ---
+
+class CommunityCreate(BaseModel):
+    creator_id: int
+    name: str
+
+class CommunityOut(BaseModel):
+    id: int
+    creator_id: int
+    name: str
+    created_at: datetime.datetime
+    member_ids: list[int] = []
+    granter_ids: list[int] = []
+    model_config = {"from_attributes": True}
+
+class CommunityMemberAdd(BaseModel):
+    user_id: int
+
+class CommunityGranterAdd(BaseModel):
+    user_id: int
 
 
 # --- Sharing Permissions ---
