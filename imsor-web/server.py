@@ -131,6 +131,151 @@ def annotations():
     return send_file(Path(__file__).parent / "static" / "annotations.html")
 
 
+@app.route("/users")
+def users():
+    return send_file(Path(__file__).parent / "static" / "users.html")
+
+
+@app.route("/admin")
+def admin():
+    return send_file(Path(__file__).parent / "static" / "admin.html")
+
+
+@app.route("/api/admin/image-cameras")
+def api_image_cameras():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_image_cameras())
+
+
+@app.route("/api/admin/cameras", methods=["GET"])
+def api_get_cameras():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_cameras())
+
+
+@app.route("/api/admin/cameras", methods=["POST"])
+def api_create_camera():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.create_camera(body["user_id"], body["make"], body["model"]))
+
+
+@app.route("/api/admin/cameras/<int:camera_id>", methods=["DELETE"])
+def api_delete_camera(camera_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.delete_camera(camera_id))
+
+
+@app.route("/api/admin/person-names")
+def api_person_names():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_person_names())
+
+
+@app.route("/api/admin/person-links", methods=["GET"])
+def api_get_person_links():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_person_links())
+
+
+@app.route("/api/admin/person-links", methods=["POST"])
+def api_create_person_link():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.create_person_link(body["person_name"], body["user_id"]))
+
+
+@app.route("/api/admin/person-links/<int:link_id>", methods=["DELETE"])
+def api_delete_person_link(link_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.delete_person_link(link_id))
+
+
+@app.route("/api/admin/users/<int:user_id>/can-create-community", methods=["PATCH"])
+def api_set_can_create_community(user_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.set_can_create_community(user_id, body["value"]))
+
+
+@app.route("/api/communities", methods=["GET"])
+def api_get_communities():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_communities())
+
+
+@app.route("/api/communities", methods=["POST"])
+def api_create_community():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    creator_id = user.get("id")  # always the logged-in user
+    return jsonify(api_client.create_community(creator_id, body["name"]))
+
+
+@app.route("/api/communities/<int:community_id>", methods=["DELETE"])
+def api_delete_community(community_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.delete_community(community_id))
+
+
+@app.route("/api/communities/<int:community_id>/members", methods=["POST"])
+def api_add_community_member(community_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.add_community_member(community_id, body["user_id"]))
+
+
+@app.route("/api/communities/<int:community_id>/members/<int:user_id>", methods=["DELETE"])
+def api_remove_community_member(community_id, user_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.remove_community_member(community_id, user_id))
+
+
+@app.route("/api/communities/<int:community_id>/granters", methods=["POST"])
+def api_add_community_granter(community_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.add_community_granter(community_id, body["user_id"]))
+
+
+@app.route("/api/communities/<int:community_id>/granters/<int:user_id>", methods=["DELETE"])
+def api_remove_community_granter(community_id, user_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.remove_community_granter(community_id, user_id))
+
+
 @app.route("/api/clusters")
 def api_clusters():
     """Return the Annotation Queue of Duplicate Clusters for the logged-in user."""

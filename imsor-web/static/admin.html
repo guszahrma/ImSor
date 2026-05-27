@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ImSor — Administration</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 2em; background: #111; color: #eee; }
+    h1 { margin-bottom: 0.25em; }
+    .nav { margin-bottom: 2em; font-size: 0.9em; }
+    .nav a { color: #aaa; text-decoration: none; margin-right: 1.5em; }
+    .nav a:hover { color: #fff; }
+
+    section { margin-bottom: 3em; }
+    section h2 { border-bottom: 1px solid #333; padding-bottom: 0.3em; margin-bottom: 1em; font-size: 1.2em; color: #ccc; }
+
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; font-size: 0.95em; }
+    th { background: #1e1e1e; color: #aaa; font-weight: normal; }
+    td { background: #161616; }
+
+    .add-row { display: flex; gap: 0.75em; align-items: center; flex-wrap: wrap; }
+    .add-row select, .add-row input[type=text] {
+      background: #1e1e1e; color: #eee; border: 1px solid #444;
+      padding: 6px 10px; border-radius: 4px; font-size: 0.95em;
+    }
+    button {
+      background: #2a6496; color: #fff; border: none; padding: 6px 14px;
+      border-radius: 4px; cursor: pointer; font-size: 0.9em;
+    }
+    button:hover { background: #1d4e78; }
+    button.danger { background: #7a1f1f; }
+    button.danger:hover { background: #5c1818; }
+    button.small { padding: 3px 9px; font-size: 0.8em; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #2a2a2a; border: 1px solid #444; border-radius: 12px;
+      padding: 2px 10px; margin: 2px; font-size: 0.85em;
+    }
+    .chip button { background: none; color: #999; border: none; cursor: pointer; padding: 0; font-size: 1em; line-height: 1; }
+    .chip button:hover { color: #f66; }
+
+    .community-card {
+      border: 1px solid #333; border-radius: 6px; padding: 1em; margin-bottom: 1em; background: #161616;
+    }
+    .community-card h3 { margin: 0 0 0.5em; font-size: 1em; color: #ddd; }
+    .community-meta { font-size: 0.85em; color: #888; margin-bottom: 0.75em; }
+    .community-section { margin-bottom: 0.75em; }
+    .community-section label { font-size: 0.85em; color: #999; display: block; margin-bottom: 4px; }
+
+    .toggle { display: flex; align-items: center; gap: 8px; }
+    .toggle input[type=checkbox] { width: 1.1em; height: 1.1em; cursor: pointer; }
+
+    #not-authorized { color: #f66; }
+    .hidden { display: none; }
+
+    .error-msg { color: #f88; font-size: 0.85em; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Home</a>
+    <a href="/users">Users</a>
+    <a href="/duplicates">Duplicates</a>
+    <a href="/annotations">Annotations</a>
+  </div>
+
+  <h1>Administration</h1>
+
+  <div id="not-authorized" class="hidden">
+    <p><strong>Access denied:</strong> Only superusers can view this page.</p>
+  </div>
+
+  <div id="admin-content" class="hidden">
+
+    <!-- ── Section 1: Person-name → User links ── -->
+    <section id="section-person-links">
+      <h2>Person → User links</h2>
+      <p style="font-size:0.85em;color:#888">Link an annotated person name to a User account, granting them annotated-user rights.</p>
+      <table id="person-links-table">
+        <thead><tr><th>Person name</th><th>User</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="add-row">
+        <select id="person-name-select"><option value="">— person name —</option></select>
+        <select id="person-link-user-select"><option value="">— user —</option></select>
+        <button onclick="addPersonLink()">Add link</button>
+        <span class="error-msg" id="person-link-error"></span>
+      </div>
+    </section>
+
+    <!-- ── Section 2: Camera assignments ── -->
+    <section id="section-cameras">
+      <h2>Camera assignments</h2>
+      <p style="font-size:0.85em;color:#888">Declare which user owns a camera of a given make and model.</p>
+      <table id="cameras-table">
+        <thead><tr><th>User</th><th>Make</th><th>Model</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="add-row">
+        <select id="camera-user-select"><option value="">— user —</option></select>
+        <select id="camera-make-model-select"><option value="">— camera (make · model) —</option></select>
+        <button onclick="addCamera()">Add assignment</button>
+        <span class="error-msg" id="camera-error"></span>
+      </div>
+    </section>
+
+    <!-- ── Section 3: Communities ── -->
+    <section id="section-communities">
+      <h2>Communities</h2>
+      <p style="font-size:0.85em;color:#888">Communities are scoped to their creator. Each has members (who can view) and granters (users allowed to grant this community access to images).</p>
+      <div id="communities-list"></div>
+      <div class="add-row" style="margin-top:0.5em">
+        <input type="text" id="community-name-input" placeholder="Community name" style="min-width:180px">
+        <button onclick="createCommunity()">Create community</button>
+        <span class="error-msg" id="community-error"></span>
+      </div>
+    </section>
+
+    <!-- ── Section 4: Community creation access ── -->
+    <section id="section-community-access">
+      <h2>Community creation access</h2>
+      <p style="font-size:0.85em;color:#888">Users with this flag can create and manage communities.</p>
+      <table id="community-access-table">
+        <thead><tr><th>User</th><th>Can create communities</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+  </div>
+
+  <script>
+    let allUsers = [];
+    let personNames = [];
+    let imageCameras = [];
+    let cameras = [];
+    let personLinks = [];
+    let communities = [];
+    let currentUserId = null;
+
+    function userName(id) {
+      const u = allUsers.find(u => u.id === id);
+      return u ? (u.display_name || u.username) : `User #${id}`;
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || j.detail || r.statusText);
+      }
+      return r.json();
+    }
+
+    // ── Person links ──
+
+    function renderPersonLinks() {
+      const tbody = document.querySelector('#person-links-table tbody');
+      tbody.innerHTML = '';
+      for (const link of personLinks) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${link.person_name}</td>
+          <td>${userName(link.user_id)}</td>
+          <td><button class="small danger" onclick="deletePersonLink(${link.id})">✕</button></td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function populatePersonNameSelect() {
+      const sel = document.getElementById('person-name-select');
+      sel.innerHTML = '<option value="">— person name —</option>';
+      for (const n of personNames) {
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        sel.appendChild(opt);
+      }
+    }
+
+    async function addPersonLink() {
+      const name = document.getElementById('person-name-select').value;
+      const userId = parseInt(document.getElementById('person-link-user-select').value);
+      const err = document.getElementById('person-link-error');
+      err.textContent = '';
+      if (!name || !userId) { err.textContent = 'Select a person name and a user.'; return; }
+      try {
+        const link = await api('POST', '/api/admin/person-links', { person_name: name, user_id: userId });
+        personLinks.push(link);
+        renderPersonLinks();
+      } catch(e) { err.textContent = e.message; }
+    }
+
+    async function deletePersonLink(id) {
+      if (!confirm('Remove this person → user link?')) return;
+      await api('DELETE', `/api/admin/person-links/${id}`);
+      personLinks = personLinks.filter(l => l.id !== id);
+      renderPersonLinks();
+    }
+
+    // ── Cameras ──
+
+    function renderCameras() {
+      const tbody = document.querySelector('#cameras-table tbody');
+      tbody.innerHTML = '';
+      for (const cam of cameras) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${userName(cam.user_id)}</td>
+          <td>${cam.make}</td>
+          <td>${cam.model}</td>
+          <td><button class="small danger" onclick="deleteCamera(${cam.id})">✕</button></td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function populateCameraMakeModelSelect() {
+      const sel = document.getElementById('camera-make-model-select');
+      sel.innerHTML = '<option value="">— camera (make · model) —</option>';
+      for (const c of imageCameras) {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(c);
+        opt.textContent = `${c.make} · ${c.model}`;
+        sel.appendChild(opt);
+      }
+    }
+
+    async function addCamera() {
+      const userId = parseInt(document.getElementById('camera-user-select').value);
+      const raw = document.getElementById('camera-make-model-select').value;
+      const err = document.getElementById('camera-error');
+      err.textContent = '';
+      if (!userId || !raw) { err.textContent = 'Select a user and a camera.'; return; }
+      const { make, model } = JSON.parse(raw);
+      try {
+        const cam = await api('POST', '/api/admin/cameras', { user_id: userId, make, model });
+        cameras.push(cam);
+        renderCameras();
+      } catch(e) { err.textContent = e.message; }
+    }
+
+    async function deleteCamera(id) {
+      if (!confirm('Remove this camera assignment?')) return;
+      await api('DELETE', `/api/admin/cameras/${id}`);
+      cameras = cameras.filter(c => c.id !== id);
+      renderCameras();
+    }
+
+    // ── Communities ──
+
+    function renderCommunities() {
+      const container = document.getElementById('communities-list');
+      container.innerHTML = '';
+      if (communities.length === 0) {
+        container.innerHTML = '<p style="color:#666;font-size:0.9em">No communities yet.</p>';
+        return;
+      }
+      for (const comm of communities) {
+        const card = document.createElement('div');
+        card.className = 'community-card';
+        card.id = `community-${comm.id}`;
+
+        const memberChips = (comm.member_ids || []).map(uid => {
+          const removeBtn = uid === comm.creator_id
+            ? ''
+            : `<button onclick="removeMember(${comm.id},${uid})" title="Remove">✕</button>`;
+          return `<span class="chip">${userName(uid)}${removeBtn}</span>`;
+        }).join('');
+
+        const granterChips = (comm.granter_ids || []).map(uid => {
+          const removeBtn = uid === comm.creator_id
+            ? ''
+            : `<button onclick="removeGranter(${comm.id},${uid})" title="Remove">✕</button>`;
+          return `<span class="chip">${userName(uid)}${removeBtn}</span>`;
+        }).join('');
+
+        const nonMembers = allUsers.filter(u => !(comm.member_ids || []).includes(u.id));
+        const memberOptions = nonMembers.map(u =>
+          `<option value="${u.id}">${u.display_name || u.username}</option>`
+        ).join('');
+
+        const nonGranters = (comm.member_ids || [])
+          .filter(uid => !(comm.granter_ids || []).includes(uid))
+          .map(uid => allUsers.find(u => u.id === uid))
+          .filter(Boolean);
+        const granterOptions = nonGranters.map(u =>
+          `<option value="${u.id}">${u.display_name || u.username}</option>`
+        ).join('');
+
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <h3>${comm.name}</h3>
+              <div class="community-meta">Creator: ${userName(comm.creator_id)}</div>
+            </div>
+            <button class="small danger" onclick="deleteCommunity(${comm.id})" title="Delete community">Delete</button>
+          </div>
+          <div class="community-section">
+            <label>Members</label>
+            <div id="members-${comm.id}">${memberChips || '<span style="color:#555;font-size:0.85em">None</span>'}</div>
+            <div class="add-row" style="margin-top:6px">
+              <select id="member-sel-${comm.id}"><option value="">— add member —</option>${memberOptions}</select>
+              <button class="small" onclick="addMember(${comm.id})">Add</button>
+            </div>
+          </div>
+          <div class="community-section">
+            <label>Granters <span style="color:#666">(users who may grant this community access to images)</span></label>
+            <div id="granters-${comm.id}">${granterChips || '<span style="color:#555;font-size:0.85em">None</span>'}</div>
+            <div class="add-row" style="margin-top:6px">
+              <select id="granter-sel-${comm.id}"><option value="">— add granter —</option>${granterOptions}</select>
+              <button class="small" onclick="addGranter(${comm.id})">Add</button>
+            </div>
+          </div>`;
+        container.appendChild(card);
+      }
+    }
+
+    async function createCommunity() {
+      const name = document.getElementById('community-name-input').value.trim();
+      const err = document.getElementById('community-error');
+      err.textContent = '';
+      if (!name) { err.textContent = 'Enter a community name.'; return; }
+      try {
+        const comm = await api('POST', '/api/communities', { name });
+        communities.push(comm);
+        document.getElementById('community-name-input').value = '';
+        renderCommunities();
+      } catch(e) { err.textContent = e.message; }
+    }
+
+    async function deleteCommunity(id) {
+      const comm = communities.find(c => c.id === id);
+      if (!confirm(`Delete community "${comm?.name}"? This cannot be undone.`)) return;
+      await api('DELETE', `/api/communities/${id}`);
+      communities = communities.filter(c => c.id !== id);
+      renderCommunities();
+    }
+
+    async function addMember(communityId) {
+      const sel = document.getElementById(`member-sel-${communityId}`);
+      const userId = parseInt(sel.value);
+      if (!userId) return;
+      await api('POST', `/api/communities/${communityId}/members`, { user_id: userId });
+      const comm = communities.find(c => c.id === communityId);
+      comm.member_ids.push(userId);
+      renderCommunities();
+    }
+
+    async function removeMember(communityId, userId) {
+      if (!confirm(`Remove ${userName(userId)} from this community?`)) return;
+      await api('DELETE', `/api/communities/${communityId}/members/${userId}`);
+      const comm = communities.find(c => c.id === communityId);
+      comm.member_ids = comm.member_ids.filter(id => id !== userId);
+      comm.granter_ids = comm.granter_ids.filter(id => id !== userId);
+      renderCommunities();
+    }
+
+    async function addGranter(communityId) {
+      const sel = document.getElementById(`granter-sel-${communityId}`);
+      const userId = parseInt(sel.value);
+      if (!userId) return;
+      await api('POST', `/api/communities/${communityId}/granters`, { user_id: userId });
+      const comm = communities.find(c => c.id === communityId);
+      comm.granter_ids.push(userId);
+      renderCommunities();
+    }
+
+    async function removeGranter(communityId, userId) {
+      if (!confirm(`Remove ${userName(userId)} as a granter?`)) return;
+      await api('DELETE', `/api/communities/${communityId}/granters/${userId}`);
+      const comm = communities.find(c => c.id === communityId);
+      comm.granter_ids = comm.granter_ids.filter(id => id !== userId);
+      renderCommunities();
+    }
+
+    // ── Community creation access ──
+
+    function renderCommunityAccess() {
+      const tbody = document.querySelector('#community-access-table tbody');
+      tbody.innerHTML = '';
+      for (const user of allUsers) {
+        const tr = document.createElement('tr');
+        const checked = user.can_create_community ? 'checked' : '';
+        tr.innerHTML = `
+          <td>${user.display_name || user.username}<br><span style="color:#666;font-size:0.8em">${user.username}</span></td>
+          <td>
+            <label class="toggle">
+              <input type="checkbox" ${checked} onchange="toggleCommunityAccess(${user.id}, this.checked)">
+              <span>${user.can_create_community ? 'Yes' : 'No'}</span>
+            </label>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function toggleCommunityAccess(userId, value) {
+      await api('PATCH', `/api/admin/users/${userId}/can-create-community`, { value });
+      const user = allUsers.find(u => u.id === userId);
+      if (user) user.can_create_community = value;
+      renderCommunityAccess();
+    }
+
+    // ── Populate shared user dropdowns ──
+
+    function populateUserDropdowns() {
+      const selectors = [
+        'person-link-user-select',
+        'camera-user-select',
+      ];
+      for (const id of selectors) {
+        const sel = document.getElementById(id);
+        const placeholder = sel.options[0].textContent;
+        sel.innerHTML = `<option value="">${placeholder}</option>`;
+        for (const u of allUsers) {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = u.display_name || u.username;
+          sel.appendChild(opt);
+        }
+      }
+    }
+
+    // ── Init ──
+
+    async function init() {
+      const me = await fetch('/api/current_user').then(r => r.json());
+      if (!me.logged_in || me.user?.role !== 'superuser') {
+        document.getElementById('not-authorized').classList.remove('hidden');
+        return;
+      }
+      currentUserId = me.user.id;
+      document.getElementById('admin-content').classList.remove('hidden');
+
+      [allUsers, personNames, imageCameras, cameras, personLinks, communities] = await Promise.all([
+        api('GET', '/api/users'),
+        api('GET', '/api/admin/person-names'),
+        api('GET', '/api/admin/image-cameras'),
+        api('GET', '/api/admin/cameras'),
+        api('GET', '/api/admin/person-links'),
+        api('GET', '/api/communities'),
+      ]);
+
+      populateUserDropdowns();
+      populatePersonNameSelect();
+      populateCameraMakeModelSelect();
+      renderPersonLinks();
+      renderCameras();
+      renderCommunities();
+      renderCommunityAccess();
+    }
+
+    init();
+  </script>
+</body>
+</html>

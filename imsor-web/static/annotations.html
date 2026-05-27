@@ -147,6 +147,12 @@
     </style>
 </head>
 <body>
+    <div id="site-nav" style="align-self:flex-start;margin-bottom:1em;font-size:0.9em;">
+      <a href="/" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Home</a>
+      <a href="/duplicates" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Duplicates</a>
+      <a href="/users" id="nav-users" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Users</a>
+      <a href="/admin" id="nav-admin" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Admin</a>
+    </div>
     <h1>ImSor — Annotations</h1>
     <div id="controls" style="display:none;">
         <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
@@ -168,6 +174,14 @@
     </div>
 
     <script>
+    // Nav: show superuser-only links
+    fetch('/api/current_user').then(r => r.json()).then(data => {
+        if (data.logged_in && data.user?.role === 'superuser') {
+            document.getElementById('nav-users').style.display = '';
+            document.getElementById('nav-admin').style.display = '';
+        }
+    }).catch(() => {});
+
         let entries = [];
         let knownPeople = [];
         let currentIndex = 0;

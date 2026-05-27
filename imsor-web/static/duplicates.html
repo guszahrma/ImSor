@@ -156,6 +156,12 @@
     </style>
 </head>
 <body>
+    <div id="site-nav" style="align-self:flex-start;margin-bottom:1em;font-size:0.9em;">
+      <a href="/" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Home</a>
+      <a href="/annotations" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Annotations</a>
+      <a href="/users" id="nav-users" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Users</a>
+      <a href="/admin" id="nav-admin" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Admin</a>
+    </div>
     <h1>ImSor — Duplicate Reviewer</h1>
     <div id="hint">Keys: 1 2 3… set original · Enter submit · ← → navigate</div>
     <div id="progress-wrap" style="display:none;"><div id="progress-bar"></div></div>
@@ -170,6 +176,14 @@
     <div id="action-bar" style="display:none;"></div>
 
     <script>
+    // Nav: show superuser-only links
+    fetch('/api/current_user').then(r => r.json()).then(data => {
+        if (data.logged_in && data.user?.role === 'superuser') {
+            document.getElementById('nav-users').style.display = '';
+            document.getElementById('nav-admin').style.display = '';
+        }
+    }).catch(() => {});
+
     // -------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------

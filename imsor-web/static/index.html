@@ -65,15 +65,20 @@
             <div class="label">Annotations</div>
             <div class="desc">View images with person detections</div>
         </a>
-        <a class="nav-card" id="users-nav-card" href="/static/users.html" style="display:none;">
+        <a class="nav-card" id="users-nav-card" href="/users" style="display:none;">
             <div class="icon">&#128101;</div>
             <div class="label">Users</div>
             <div class="desc">View and manage all users (superuser only)</div>
         </a>
+        <a class="nav-card" id="admin-nav-card" href="/admin" style="display:none;">
+            <div class="icon">&#9881;&#65039;</div>
+            <div class="label">Administration</div>
+            <div class="desc">Cameras, communities, person links</div>
+        </a>
     </div>
     <div id="auth-section" style="margin-top: 40px;"></div>
     <script>
-    async function updateAuthSection() {
+    async function init() {
         const section = document.getElementById('auth-section');
         section.innerHTML = '<span style="color:#aaa">Checking login status...</span>';
         try {
@@ -88,6 +93,10 @@
                         <a href="/logout" style="margin-left:20px;background:#e74c3c;color:white;padding:8px 18px;border-radius:4px;text-decoration:none;font-weight:600;">Logout</a>
                     </div>
                 `;
+                if (user.role === 'superuser') {
+                    document.getElementById('users-nav-card').style.display = '';
+                    document.getElementById('admin-nav-card').style.display = '';
+                }
             } else {
                 section.innerHTML = `
                     <a href="/login/google?prompt=select_account" style="
@@ -111,20 +120,7 @@
             section.innerHTML = '<span style="color:#e74c3c">Failed to check login status.</span>';
         }
     }
-    updateAuthSection();
-    // Show Users button only for superusers
-    async function showUsersButtonIfSuperuser() {
-        try {
-            const resp = await fetch('/api/current_user');
-            const data = await resp.json();
-            if (data.logged_in && data.user && data.user.role === 'superuser') {
-                document.getElementById('users-nav-card').style.display = '';
-            }
-        } catch (e) {
-            // ignore
-        }
-    }
-    showUsersButtonIfSuperuser();
+    init();
 </script>
 </body>
 </html>
