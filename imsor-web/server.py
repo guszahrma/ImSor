@@ -131,24 +131,40 @@ def annotations():
     return send_file(Path(__file__).parent / "static" / "annotations.html")
 
 
-@app.route("/api/pairs")
-def pairs():
-    """Return unresolved duplicate pairs with image metadata."""
-    raw_pairs = api_client.get_unresolved_pairs()
-    result = []
-    for pair in raw_pairs:
-        try:
-            image_a = api_client.get_image(pair["image_a_id"])
-            image_b = api_client.get_image(pair["image_b_id"])
-        except Exception:
-            continue
-        result.append({
-            "id": pair["id"],
-            "match_type": pair["match_type"],
-            "image_a": image_a,
-            "image_b": image_b,
-        })
-    return jsonify(result)
+@app.route("/api/clusters")
+def api_clusters():
+    """Return the Annotation Queue of Duplicate Clusters for the logged-in user."""
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    user_id = user.get("id")
+    if not user_id:
+        return jsonify({"error": "user has no id"}), 400
+    try:
+        clusters = api_client.get_clusters(user_id)
+        return jsonify(clusters)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/clusters/vote", methods=["POST"])
+def api_submit_cluster_vote():
+    """Submit a Cluster Vote for the logged-in user."""
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    user_id = user.get("id")
+    if not user_id:
+        return jsonify({"error": "user has no id"}), 400
+    body = request.get_json()
+    votes = body.get("votes") if body else None
+    if not isinstance(votes, list):
+        return jsonify({"error": "votes must be a list"}), 400
+    try:
+        result = api_client.submit_cluster_vote(user_id, votes)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/annotated-images")
@@ -222,6 +238,7 @@ def serve_image(image_id: int):
 
     mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     return send_file(file_path, mimetype=mime_type)
+
 
 
 @app.route("/api/users")

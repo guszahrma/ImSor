@@ -15,189 +15,537 @@
             align-items: center;
             padding: 20px;
         }
-        h1 {
-            margin-bottom: 10px;
-            font-size: 1.4rem;
+
+        h1 { margin-bottom: 8px; font-size: 1.4rem; }
+
+        #hint {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 6px;
         }
-        #status {
-            margin-bottom: 20px;
-            color: #aaa;
-            font-size: 0.9rem;
+
+        #status { color: #aaa; font-size: 0.9rem; margin-bottom: 6px; }
+
+        #progress-wrap {
+            width: 320px; height: 5px;
+            background: #333; border-radius: 3px;
+            margin-bottom: 16px; overflow: hidden;
         }
-        #pair-container {
+        #progress-bar {
+            height: 100%; background: #4caf50;
+            border-radius: 3px; transition: width 0.3s;
+            width: 0%;
+        }
+
+        /* Image strip */
+        #image-strip {
             display: flex;
-            gap: 30px;
+            gap: 24px;
             max-width: 95vw;
             justify-content: center;
             flex-wrap: wrap;
+            margin-bottom: 20px;
         }
+
         .image-panel {
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 8px;
         }
-        .image-panel .filepath {
-            font-size: 0.8rem;
-            color: #ccc;
-            margin-bottom: 8px;
-            word-break: break-all;
-            text-align: center;
+
+        .image-number {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #aaa;
         }
+
         .image-panel img {
-            max-height: 70vh;
-            border: 2px solid #333;
+            max-height: 60vh;
+            border: 3px solid #333;
             border-radius: 4px;
             object-fit: contain;
             background: #111;
+            transition: border-color 0.15s;
         }
-        #controls {
-            margin-bottom: 10px;
+        .image-panel img.is-original { border-color: #4caf50; }
+
+        .filepath {
+            font-size: 1.44rem;
+            word-break: break-all;
+            text-align: center;
+        }
+        .path-common { color: #555; }
+        .path-diff   { color: #fff; font-weight: bold; }
+
+        /* Original button */
+        .btn-original {
+            padding: 6px 18px;
+            font-size: 0.85rem;
+            border: 2px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            background: transparent;
+            color: #ccc;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .btn-original:hover { border-color: #4caf50; color: #4caf50; }
+        .btn-original.active {
+            background: #2e7d32;
+            border-color: #4caf50;
+            color: #fff;
+        }
+
+        /* Redundant-of label / dropdown */
+        .redundant-label {
+            font-size: 0.82rem;
+            color: #aaa;
+            text-align: center;
+        }
+        select.redundant-select {
+            background: #2a2a4a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        /* Action bar */
+        #action-bar {
             display: flex;
-            gap: 15px;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 24px;
         }
-        button {
-            padding: 10px 24px;
-            font-size: 1rem;
+
+        .btn {
+            padding: 10px 26px;
+            font-size: 0.95rem;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            background: #4a4a8a;
             color: #fff;
         }
-        button:hover { background: #5a5aaa; }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
-        #loading {
-            font-size: 1.2rem;
-            color: #aaa;
-            margin-top: 40px;
+        .btn-submit  { background: #1565c0; }
+        .btn-submit:hover:not(:disabled) { background: #1976d2; }
+        .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn-skip    { background: #37474f; }
+        .btn-skip:hover { background: #455a64; }
+
+        /* Nav */
+        #nav-bar {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 8px;
         }
+        .btn-nav {
+            padding: 7px 18px;
+            font-size: 0.85rem;
+            border: none; border-radius: 4px;
+            cursor: pointer;
+            background: #4a4a8a; color: #fff;
+        }
+        .btn-nav:hover { background: #5a5aaa; }
+        .btn-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        #loading { font-size: 1.1rem; color: #aaa; margin-top: 40px; }
+        #empty    { font-size: 1rem;  color: #aaa; margin-top: 30px; }
     </style>
 </head>
 <body>
     <h1>ImSor — Duplicate Reviewer</h1>
-    <div id="controls" style="display:none;">
-        <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
-        <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
-    </div>
+    <div id="hint">Keys: 1 2 3… set original · Enter submit · ← → navigate</div>
+    <div id="progress-wrap" style="display:none;"><div id="progress-bar"></div></div>
     <div id="status"></div>
-    <div id="loading">Loading duplicate pairs...</div>
-    <div id="set-container" style="display:none;"></div>
+    <div id="nav-bar" style="display:none;">
+        <button class="btn-nav" id="btn-prev" onclick="navigate(-1)">&#9664; Prev</button>
+        <button class="btn-nav" id="btn-next" onclick="navigate(1)">Next &#9654;</button>
+    </div>
+    <div id="loading">Loading clusters…</div>
+    <div id="empty"  style="display:none;">No duplicate clusters to review — all done!</div>
+    <div id="image-strip"></div>
+    <div id="action-bar" style="display:none;"></div>
 
     <script>
-        let sets = [];
-        let currentIndex = 0;
+    // -------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------
+    let clusters = [];
+    let currentIndex = 0;
 
-        function groupPairsIntoSets(pairs) {
-            // Union-Find to merge overlapping pairs into sets
-            const parent = {};
-            function find(x) {
-                if (!(x in parent)) parent[x] = x;
-                while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-                return x;
-            }
-            function union(a, b) { parent[find(a)] = find(b); }
+    // voteState: Map<cluster_id, Map<image_id, keeper_id|null>>
+    // null = unmarked, same id = Original, other id = Redundant of that image
+    const voteState = new Map();
 
-            const imageMap = {};  // id -> image object
+    // cluster_ids submitted this session (kept for navigation/re-submission)
+    const submittedInSession = new Set();
 
-            for (const pair of pairs) {
-                const aId = pair.image_a.id;
-                const bId = pair.image_b.id;
-                imageMap[aId] = pair.image_a;
-                imageMap[bId] = pair.image_b;
-                union(aId, bId);
-            }
-
-            // Group by root
-            const groups = {};
-            for (const id of Object.keys(imageMap)) {
-                const root = find(Number(id));
-                if (!groups[root]) groups[root] = [];
-                groups[root].push(imageMap[id]);
-            }
-
-            return Object.values(groups);
-        }
-
-        async function loadPairs() {
-            let pairs;
-            try {
-                const resp = await fetch("/api/pairs");
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                pairs = await resp.json();
-            } catch (err) {
+    // -------------------------------------------------------------------
+    // Boot
+    // -------------------------------------------------------------------
+    async function loadClusters() {
+        try {
+            const resp = await fetch("/api/clusters");
+            if (resp.status === 401) {
                 document.getElementById("loading").textContent =
-                    "Error loading pairs: " + err.message;
+                    "Please log in to review duplicates.";
                 return;
             }
-
-            document.getElementById("loading").style.display = "none";
-
-            if (pairs.length === 0) {
-                document.getElementById("status").textContent =
-                    "No unresolved duplicate pairs found.";
-                return;
-            }
-
-            sets = groupPairsIntoSets(pairs);
-
-            document.getElementById("set-container").style.display = "flex";
-            document.getElementById("controls").style.display = "flex";
-            showSet();
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            clusters = await resp.json();
+        } catch (err) {
+            document.getElementById("loading").textContent =
+                "Error loading clusters: " + err.message;
+            return;
         }
 
-        function showSet() {
-            const images = sets[currentIndex];
-            document.getElementById("status").textContent =
-                `Set ${currentIndex + 1} of ${sets.length} — ${images.length} images`;
+        document.getElementById("loading").style.display = "none";
 
-            const container = document.getElementById("set-container");
-            container.innerHTML = "";
-            container.style.display = "flex";
-            container.style.gap = "30px";
-            container.style.maxWidth = "95vw";
-            container.style.justifyContent = "center";
-            container.style.flexWrap = "wrap";
-
-            // Scale image widths so they share the viewport evenly
-            const maxW = Math.min(Math.floor(90 / images.length), 45);
-
-            for (const img of images) {
-                const panel = document.createElement("div");
-                panel.className = "image-panel";
-                panel.style.maxWidth = maxW + "vw";
-
-                const path = document.createElement("div");
-                path.className = "filepath";
-                path.style.maxWidth = maxW + "vw";
-                path.textContent = img.file_path;
-
-                const imgEl = document.createElement("img");
-                imgEl.src = `/serve/${img.id}`;
-                imgEl.alt = img.file_name;
-                imgEl.style.maxWidth = maxW + "vw";
-
-                panel.appendChild(path);
-                panel.appendChild(imgEl);
-                container.appendChild(panel);
-            }
-
-            document.getElementById("btn-prev").disabled = currentIndex === 0;
-            document.getElementById("btn-next").disabled = currentIndex === sets.length - 1;
+        if (clusters.length === 0) {
+            document.getElementById("empty").style.display = "block";
+            return;
         }
 
-        function navigate(delta) {
-            currentIndex += delta;
-            if (currentIndex < 0) currentIndex = 0;
-            if (currentIndex >= sets.length) currentIndex = sets.length - 1;
-            showSet();
-        }
+        document.getElementById("progress-wrap").style.display = "block";
+        document.getElementById("nav-bar").style.display = "flex";
+        document.getElementById("action-bar").style.display = "flex";
+        showCluster();
+    }
 
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "ArrowLeft") navigate(-1);
-            if (e.key === "ArrowRight") navigate(1);
+    // -------------------------------------------------------------------
+    // Path diff highlighting
+    // -------------------------------------------------------------------
+    function escHtml(s) {
+        return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function buildPathHighlights(paths) {
+        const split = paths.map(p => p.split("/"));
+        const maxLen = Math.max(...split.map(s => s.length));
+
+        // For each segment position: is it identical across all paths?
+        const common = Array.from({ length: maxLen }, (_, i) => {
+            const vals = split.map(s => (i < s.length ? s[i] : ""));
+            return vals.every(v => v === vals[0]);
         });
 
-        loadPairs();
+        return split.map(segs => {
+            return segs.map((seg, i) => {
+                const sep = i === 0 ? "" : "/";
+                const escaped = escHtml(sep + seg);
+                return common[i]
+                    ? `<span class="path-common">${escaped}</span>`
+                    : `<span class="path-diff">${escaped}</span>`;
+            }).join("");
+        });
+    }
+
+    // -------------------------------------------------------------------
+    // Vote state helpers
+    // -------------------------------------------------------------------
+    function getVote(cid, images) {
+        if (!voteState.has(cid)) {
+            const m = new Map();
+            images.forEach(img => m.set(img.id, null));  // all start unmarked
+            voteState.set(cid, m);
+        }
+        return voteState.get(cid);
+    }
+
+    function isVoteReady(vote) {
+        // Ready when at least one Original is selected (auto-assigns make others non-null)
+        return [...vote.values()].some(v => v !== null);
+    }
+
+    function toggleOriginal(cid, imageId, images) {
+        const vote = getVote(cid, images);
+        const isOriginal = vote.get(imageId) === imageId;
+
+        if (isOriginal) {
+            // Un-mark this image as Original
+            const otherOriginals = images
+                .filter(img => img.id !== imageId && vote.get(img.id) === img.id)
+                .map(img => img.id);
+
+            if (otherOriginals.length === 0) {
+                // Was the only Original → reset everything to null
+                images.forEach(img => vote.set(img.id, null));
+            } else {
+                // Reassign images that were Redundant of this one to the first other Original
+                images.forEach(img => {
+                    if (vote.get(img.id) === imageId) {
+                        vote.set(img.id, otherOriginals[0]);
+                    }
+                });
+                vote.set(imageId, null);  // un-mark this one last
+            }
+        } else {
+            // Mark as Original
+            const originals = images
+                .filter(img => vote.get(img.id) === img.id)
+                .map(img => img.id);
+
+            vote.set(imageId, imageId);
+
+            if (originals.length === 0) {
+                // First Original selected → auto-assign all others as Redundant of this
+                images.forEach(img => {
+                    if (img.id !== imageId) vote.set(img.id, imageId);
+                });
+            }
+            // If other Originals already exist, leave their Redundant assignments unchanged
+        }
+
+        render();
+    }
+
+    // -------------------------------------------------------------------
+    // Rendering
+    // -------------------------------------------------------------------
+    function showCluster() {
+        updateStatus();
+        render();
+        updateProgress();
+    }
+
+    function updateStatus() {
+        const cid = clusters[currentIndex]?.cluster_id;
+        const isSubmitted = submittedInSession.has(cid);
+        const pending = clusters.filter(c => !submittedInSession.has(c.cluster_id)).length;
+        const badge = isSubmitted ? "  ✓ submitted" : "";
+        document.getElementById("status").textContent =
+            `Cluster ${currentIndex + 1} of ${clusters.length}  ·  ${submittedInSession.size} submitted, ${pending} pending${badge}`;
+        document.getElementById("btn-prev").disabled = currentIndex === 0;
+        document.getElementById("btn-next").disabled = currentIndex === clusters.length - 1;
+    }
+
+    function render() {
+        const cluster = clusters[currentIndex];
+        const { images, cluster_id: cid } = cluster;
+        const vote = getVote(cid, images);
+
+        const originals = images
+            .filter(img => vote.get(img.id) === img.id)
+            .map(img => img.id);
+
+        // Pre-compute path diff highlights
+        const pathHighlights = buildPathHighlights(images.map(img => img.file_path));
+
+        // --- Image strip ---
+        const strip = document.getElementById("image-strip");
+        strip.innerHTML = "";
+        const maxW = Math.min(Math.floor(88 / images.length), 42);
+
+        images.forEach((img, idx) => {
+            const num = idx + 1;
+            const keeper = vote.get(img.id);
+            const isOriginal = keeper === img.id;
+            const isNull = keeper === null;
+
+            const panel = document.createElement("div");
+            panel.className = "image-panel";
+            panel.style.maxWidth = maxW + "vw";
+
+            // Number label
+            const numEl = document.createElement("div");
+            numEl.className = "image-number";
+            numEl.textContent = `#${num}`;
+
+            // Image
+            const imgEl = document.createElement("img");
+            imgEl.src = `/serve/${img.id}`;
+            imgEl.alt = img.file_name;
+            imgEl.style.maxWidth = maxW + "vw";
+            if (isOriginal) imgEl.classList.add("is-original");
+
+            // Path (with diff highlighting)
+            const pathEl = document.createElement("div");
+            pathEl.className = "filepath";
+            pathEl.style.maxWidth = maxW + "vw";
+            pathEl.innerHTML = pathHighlights[idx];
+
+            // "Set as original" / "✓ Original" button
+            const btnOrig = document.createElement("button");
+            btnOrig.className = "btn-original" + (isOriginal ? " active" : "");
+            btnOrig.textContent = isOriginal ? "✓ Original" : "Set as original";
+            btnOrig.onclick = () => toggleOriginal(cid, img.id, images);
+
+            panel.appendChild(numEl);
+            panel.appendChild(imgEl);
+            panel.appendChild(pathEl);
+            panel.appendChild(btnOrig);
+
+            // Redundant-of label / dropdown (only when image is assigned as Redundant)
+            if (!isOriginal && !isNull) {
+                if (originals.length > 1) {
+                    const label = document.createElement("div");
+                    label.className = "redundant-label";
+                    label.textContent = "Redundant of:";
+
+                    const sel = document.createElement("select");
+                    sel.className = "redundant-select";
+                    originals.forEach(oid => {
+                        const oIdx = images.findIndex(i => i.id === oid);
+                        const opt = document.createElement("option");
+                        opt.value = oid;
+                        opt.textContent = `#${oIdx + 1}`;
+                        if (keeper === oid) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    sel.onchange = () => {
+                        voteState.get(cid).set(img.id, parseInt(sel.value));
+                    };
+                    panel.appendChild(label);
+                    panel.appendChild(sel);
+                } else {
+                    const oIdx = images.findIndex(i => i.id === originals[0]);
+                    const label = document.createElement("div");
+                    label.className = "redundant-label";
+                    label.textContent = `Redundant of #${oIdx + 1}`;
+                    panel.appendChild(label);
+                }
+            }
+
+            strip.appendChild(panel);
+        });
+
+        // --- Action bar ---
+        const bar = document.getElementById("action-bar");
+        bar.innerHTML = "";
+
+        const alreadySubmitted = submittedInSession.has(cid);
+
+        const btnSubmit = document.createElement("button");
+        btnSubmit.className = "btn btn-submit";
+        btnSubmit.id = "btn-submit";
+        btnSubmit.textContent = alreadySubmitted ? "Re-submit vote" : "Submit vote";
+        btnSubmit.disabled = !isVoteReady(vote);
+        btnSubmit.onclick = submitVote;
+
+        const btnSkip = document.createElement("button");
+        btnSkip.className = "btn btn-skip";
+        btnSkip.textContent = alreadySubmitted ? "Next →" : "Skip";
+        btnSkip.onclick = () => navigate(1);
+
+        bar.appendChild(btnSubmit);
+        bar.appendChild(btnSkip);
+    }
+
+    function updateProgress() {
+        const pct = clusters.length
+            ? Math.round((submittedInSession.size / clusters.length) * 100)
+            : 0;
+        document.getElementById("progress-bar").style.width = pct + "%";
+    }
+
+    // -------------------------------------------------------------------
+    // Submit
+    // -------------------------------------------------------------------
+    async function submitVote() {
+        const cluster = clusters[currentIndex];
+        const { cluster_id: cid, images } = cluster;
+        const vote = getVote(cid, images);
+
+        if (!isVoteReady(vote)) return;
+
+        const votes = [];
+        vote.forEach((keeperId, imageId) => {
+            if (keeperId !== null) {
+                votes.push({ image_id: imageId, value: String(keeperId) });
+            }
+        });
+
+        const btn = document.getElementById("btn-submit");
+        btn.disabled = true;
+        btn.textContent = "Submitting…";
+
+        try {
+            const resp = await fetch("/api/clusters/vote", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ votes }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${resp.status}`);
+            }
+
+            submittedInSession.add(cid);
+
+            // Advance to the next pending (unsubmitted) cluster if one exists
+            const nextPending = clusters.findIndex(
+                (c, i) => i > currentIndex && !submittedInSession.has(c.cluster_id)
+            );
+            if (nextPending !== -1) {
+                currentIndex = nextPending;
+            } else {
+                // No more pending ahead — try before current index
+                const prevPending = clusters.findIndex(
+                    (c, i) => i < currentIndex && !submittedInSession.has(c.cluster_id)
+                );
+                if (prevPending !== -1) {
+                    currentIndex = prevPending;
+                }
+                // else: all done, stay on current (which now shows Re-submit)
+            }
+
+            const allDone = submittedInSession.size === clusters.length;
+            if (allDone) {
+                document.getElementById("empty").style.display = "block";
+                document.getElementById("empty").textContent =
+                    `All ${clusters.length} cluster(s) submitted! Use ← → to review or revise your votes.`;
+            }
+            showCluster();
+        } catch (err) {
+            alert("Error submitting vote: " + err.message);
+            btn.disabled = false;
+            btn.textContent = "Submit vote";
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------
+    function navigate(delta) {
+        currentIndex = Math.max(0, Math.min(clusters.length - 1, currentIndex + delta));
+        showCluster();
+    }
+
+    // -------------------------------------------------------------------
+    // Keyboard
+    // -------------------------------------------------------------------
+    document.addEventListener("keydown", e => {
+        // Don't intercept keys when a select/button has focus
+        if (e.target.tagName === "SELECT") return;
+
+        // Digit keys 1–9: toggle Original for that image
+        if (e.key >= "1" && e.key <= "9") {
+            const cluster = clusters[currentIndex];
+            if (!cluster) return;
+            const idx = parseInt(e.key) - 1;
+            if (idx < cluster.images.length) {
+                toggleOriginal(cluster.cluster_id, cluster.images[idx].id, cluster.images);
+            }
+            return;
+        }
+
+        if (e.key === "Enter") {
+            const btn = document.getElementById("btn-submit");
+            if (btn && !btn.disabled) submitVote();
+            return;
+        }
+
+        if (e.key === "ArrowLeft")  { navigate(-1); return; }
+        if (e.key === "ArrowRight") { navigate(1);  return; }
+    });
+
+    // -------------------------------------------------------------------
+    // Start
+    // -------------------------------------------------------------------
+    loadClusters();
     </script>
 </body>
 </html>

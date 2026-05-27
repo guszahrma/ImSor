@@ -79,18 +79,40 @@ class DuplicatePairCreate(BaseModel):
     image_b_id: int
     match_type: str = "checksum"
 
-class DuplicatePairResolve(BaseModel):
-    resolution: str  # "keep_a", "keep_b", "keep_both"
-
 class DuplicatePairOut(BaseModel):
     id: int
     image_a_id: int
     image_b_id: int
     match_type: str
-    resolved: bool
-    resolution: str | None
     created_at: datetime.datetime
     model_config = {"from_attributes": True}
+
+
+class DuplicateRoleVote(BaseModel):
+    image_id: int
+    value: str  # str(image_id) — own ID = Original, other image's ID = Redundant
+
+class ClusterVoteSubmit(BaseModel):
+    user_id: int
+    votes: list[DuplicateRoleVote]
+
+class ClusterImageOut(BaseModel):
+    id: int
+    file_path: str
+    file_name: str
+    file_size: int | None
+    checksum: str | None
+    date_taken: datetime.datetime | None
+    image_width: int | None
+    image_height: int | None
+    model_config = {"from_attributes": True}
+
+class ClusterOut(BaseModel):
+    cluster_id: int                      # min image_id in the cluster (stable identifier)
+    images: list[ClusterImageOut]
+    annotator_count: int                 # distinct users with duplicate_role votes on this cluster
+    current_user_voted: bool
+    current_user_votes: list[DuplicateRoleVote]  # empty if not yet voted
 
 
 # --- Annotations ---

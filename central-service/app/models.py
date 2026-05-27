@@ -1,6 +1,6 @@
 import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean,
+    Column, Integer, String, Float, DateTime, ForeignKey, Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -53,8 +53,6 @@ class DuplicatePair(Base):
     image_a_id = Column(Integer, ForeignKey("images.id"), nullable=False)
     image_b_id = Column(Integer, ForeignKey("images.id"), nullable=False)
     match_type = Column(String(50), default="checksum")  # e.g. "checksum", "visual"
-    resolved = Column(Boolean, default=False)
-    resolution = Column(String(50))  # e.g. "keep_a", "keep_b", "keep_both"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     image_a = relationship("Image", foreign_keys=[image_a_id])

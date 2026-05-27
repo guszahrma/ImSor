@@ -56,8 +56,16 @@ def _request(method: str, url: str, **kwargs) -> requests.Response:
     return resp
 
 
-def get_unresolved_pairs() -> list[dict]:
-    return _request("GET", f"{config.server_url}/duplicates/").json()
+def get_clusters(user_id: int) -> list[dict]:
+    """Return the Annotation Queue of Duplicate Clusters for the given annotator."""
+    return _request("GET", f"{config.server_url}/duplicates/clusters",
+                    params={"user_id": user_id}).json()
+
+
+def submit_cluster_vote(user_id: int, votes: list[dict]) -> list[dict]:
+    """Upsert a Cluster Vote. votes: [{"image_id": int, "value": str}, ...]"""
+    return _request("POST", f"{config.server_url}/annotations/batch-vote",
+                    json={"user_id": user_id, "votes": votes}).json()
 
 
 def get_image(image_id: int) -> dict:
@@ -80,3 +88,5 @@ def get_all_users() -> list[dict]:
 def update_annotation(annotation_id: int, value: str) -> dict:
     return _request("PATCH", f"{config.server_url}/annotations/{annotation_id}",
                      json={"value": value}).json()
+
+
