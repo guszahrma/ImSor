@@ -56,26 +56,31 @@
 
         /* ── Image area ──────────────────────────────────────────────────── */
         #image-area {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
+            flex: 1; overflow: hidden;
+            display: flex; flex-direction: column;
         }
-        #main-img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            display: block;
-            border-radius: 4px;
+
+        /* ── Viewport (zoom / pan host) ──────────────────────────────────── */
+        #viewport {
+            flex: 1; width: 100%;
+            overflow: hidden; position: relative;
+            cursor: default;
         }
-        #filepath {
-            position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-            font-size: 0.7rem; color: #444; white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis; max-width: 80%;
-            pointer-events: none;
+        #viewport.pan-ready { cursor: grab !important; }
+        #viewport.panning   { cursor: grabbing !important; }
+        #zoom-indicator {
+            position: absolute; bottom: 8px; right: 10px;
+            font-size: 0.75rem; color: #555;
+            pointer-events: none; z-index: 5;
         }
+
+        /* ── Image container (carries the CSS transform) ─────────────────── */
+        #image-container {
+            position: absolute; top: 0; left: 0;
+            display: inline-block;
+            transform-origin: 0 0;
+        }
+        #image-container img { display: block; border-radius: 4px; }
 
         /* ── Rating bar ──────────────────────────────────────────────────── */
         #rating-bar {
@@ -153,6 +158,49 @@
         }
         #btn-veto:hover { background: #3a1a1a; color: #e87070; }
         #btn-veto.active { background: #5a1a1a; color: #ff6060; border-color: #ff6060; }
+
+        /* ── Help button ─────────────────────────────────────────────────── */
+        #help-btn {
+            position: fixed; top: 7px; right: 14px;
+            background: #333; border: none; border-radius: 50%;
+            width: 32px; height: 32px; font-size: 0.95rem; color: #ccc;
+            cursor: pointer; z-index: 99;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+        }
+        #help-btn:hover { background: #555; color: #fff; }
+
+        /* ── Help panel ──────────────────────────────────────────────────── */
+        #help-panel {
+            position: fixed; top: 0; right: 0;
+            width: 300px; height: 100vh;
+            background: #1a1a2a; border-left: 1px solid #444;
+            padding: 2em 1.5em; overflow-y: auto;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        #help-panel.open { transform: translateX(0); }
+        #help-panel h2 { font-size: 1.1rem; margin-bottom: 1.2em; color: #ddd; }
+        #help-panel h3 {
+            font-size: 0.78rem; color: #777; text-transform: uppercase;
+            letter-spacing: 0.08em; margin: 1.2em 0 0.5em;
+        }
+        #help-panel h3:first-of-type { margin-top: 0; }
+        #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
+        #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        kbd {
+            display: inline-block; background: #2a2a3a; border: 1px solid #555;
+            border-radius: 3px; padding: 1px 6px;
+            font-family: monospace; font-size: 0.78rem; color: #ccc;
+        }
+        #help-close {
+            position: absolute; top: 0.8em; right: 1em;
+            background: none; border: none; color: #777;
+            font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1;
+        }
+        #help-close:hover { color: #fff; background: none; }
     </style>
 </head>
 <body>
@@ -172,12 +220,56 @@
         <div id="status"></div>
     </div>
 
+    <button id="help-btn" onclick="toggleHelp()" title="Help (H)">?</button>
+
+    <div id="help-panel">
+        <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+        <h2>Keyboard &amp; button guide</h2>
+
+        <h3>Navigation</h3>
+        <table><tbody>
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+        </tbody></table>
+
+        <h3>Rating</h3>
+        <table><tbody>
+            <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>Rate image and advance</td></tr>
+            <tr><td><kbd>Del</kbd> / <kbd>Backspace</kbd></td><td>Remove rating</td></tr>
+        </tbody></table>
+
+        <h3>Zoom &amp; pan</h3>
+        <table><tbody>
+            <tr><td><kbd>Ctrl</kbd>+scroll</td><td>Zoom in / out</td></tr>
+            <tr><td><kbd>Space</kbd>+drag</td><td>Pan</td></tr>
+            <tr><td>Middle-drag</td><td>Pan</td></tr>
+            <tr><td>Double-click</td><td>Reset zoom &amp; pan</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Reset zoom &amp; pan</td></tr>
+        </tbody></table>
+
+        <h3>Veto &amp; skip</h3>
+        <table><tbody>
+            <tr><td><kbd>V</kbd></td><td>Toggle veto — excludes image from slideshow regardless of rating</td></tr>
+            <tr><td><kbd>S</kbd></td><td>Skip — remove from your queue, never show again</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>U</kbd></td><td>Undo last skip</td></tr>
+        </tbody></table>
+
+        <h3>This panel</h3>
+        <table><tbody>
+            <tr><td><kbd>H</kbd></td><td>Toggle this panel</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close this panel</td></tr>
+        </tbody></table>
+    </div>
+
     <div id="loading-area"><div id="loading">Loading…</div></div>
 
     <div id="main-layout">
         <div id="image-area">
-            <img id="main-img" alt="">
-            <div id="filepath"></div>
+            <div id="viewport">
+                <div id="image-container">
+                    <img id="main-img" alt="">
+                </div>
+                <div id="zoom-indicator"></div>
+            </div>
         </div>
         <div id="rating-bar">
             <!-- buttons 0–9 injected by JS -->
@@ -189,6 +281,74 @@
     </div>
 
     <script>
+    // ── Help panel ─────────────────────────────────────────────────────────
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
+    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+
+    // ── Zoom / pan ─────────────────────────────────────────────────────────
+    const viewport  = document.getElementById('viewport');
+    const container = document.getElementById('image-container');
+    const img       = document.getElementById('main-img');
+
+    let zoom = 1, panX = 0, panY = 0;
+    let isPanReady = false, isPanning = false;
+    let panStart = null;
+
+    function applyTransform() {
+        container.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
+        const pct = Math.round(zoom * 100);
+        document.getElementById('zoom-indicator').textContent = pct === 100 ? '' : `${pct}%`;
+    }
+
+    function resetZoom() {
+        zoom = 1;
+        panX = Math.max(0, (viewport.clientWidth  - img.clientWidth)  / 2);
+        panY = Math.max(0, (viewport.clientHeight - img.clientHeight) / 2);
+        applyTransform();
+    }
+
+    viewport.addEventListener('wheel', e => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const vx = e.clientX - rect.left;
+        const vy = e.clientY - rect.top;
+        const cx = (vx - panX) / zoom;
+        const cy = (vy - panY) / zoom;
+        const delta = e.deltaMode === 1 ? e.deltaY * 20 : e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY;
+        zoom = Math.max(0.25, Math.min(16, zoom * Math.pow(0.999, delta)));
+        panX = vx - cx * zoom;
+        panY = vy - cy * zoom;
+        applyTransform();
+    }, { passive: false });
+
+    viewport.addEventListener('dblclick', () => resetZoom());
+
+    viewport.addEventListener('mousedown', e => {
+        if (e.button === 1 || (e.button === 0 && isPanReady)) {
+            isPanning = true;
+            panStart = { x: e.clientX, y: e.clientY, px: panX, py: panY };
+            viewport.classList.remove('pan-ready');
+            viewport.classList.add('panning');
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (!isPanning) return;
+        panX = panStart.px + (e.clientX - panStart.x);
+        panY = panStart.py + (e.clientY - panStart.y);
+        applyTransform();
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!isPanning) return;
+        isPanning = false;
+        viewport.classList.remove('panning');
+        if (isPanReady) viewport.classList.add('pan-ready');
+    });
+
     // ── Nav ────────────────────────────────────────────────────────────────
     fetch('/api/current_user').then(r => r.json()).then(data => {
         if (data.logged_in && data.user?.role === 'superuser') {
@@ -281,8 +441,17 @@
     async function showImage(index) {
         currentIndex = index;
         const item = queue[index];
-        document.getElementById('main-img').src = `/serve/${item.image_id}`;
-        document.getElementById('filepath').textContent = '';
+        img.onload = function () {
+            const natW = img.naturalWidth;
+            const natH = img.naturalHeight;
+            const vpW  = viewport.clientWidth  - 4;
+            const vpH  = viewport.clientHeight - 4;
+            const fit  = Math.min(1, vpW / natW, vpH / natH);
+            img.style.width  = Math.round(natW * fit) + 'px';
+            img.style.height = Math.round(natH * fit) + 'px';
+            resetZoom();
+        };
+        img.src = `/serve/${item.image_id}`;
         renderRating(item.rating);
         renderVeto(item.veto_annotation_id !== null);
         updateStatus();
@@ -375,6 +544,8 @@
     document.getElementById('btn-veto').addEventListener('click', toggleVeto);
 
     // ── Skip ───────────────────────────────────────────────────────────────
+    const skipUndoStack = [];   // [{item, index, annotationId}, …]
+
     async function skipImage() {
         const item = queue[currentIndex];
         try {
@@ -384,6 +555,8 @@
                 body: JSON.stringify({ image_id: item.image_id, annotation_type: 'skip', value: '1' }),
             });
             if (!resp.ok) throw new Error(await resp.text());
+            const ann = await resp.json();
+            skipUndoStack.push({ item, index: currentIndex, annotationId: ann.id });
             queue.splice(currentIndex, 1);
             if (queue.length === 0) {
                 document.getElementById('main-layout').style.display = 'none';
@@ -398,6 +571,20 @@
         }
     }
 
+    async function undoSkip() {
+        if (skipUndoStack.length === 0) return;
+        const { item, index, annotationId } = skipUndoStack.pop();
+        try {
+            const resp = await fetch(`/api/annotations/${annotationId}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error(await resp.text());
+            const insertAt = Math.min(index, queue.length);
+            queue.splice(insertAt, 0, item);
+            await showImage(insertAt);
+        } catch (err) {
+            alert('Error undoing skip: ' + err.message);
+        }
+    }
+
     document.getElementById('btn-skip').addEventListener('click', skipImage);
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -409,14 +596,30 @@
 
     // ── Keyboard ───────────────────────────────────────────────────────────
     document.addEventListener('keydown', e => {
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            if (!isPanReady) { isPanReady = true; viewport.classList.add('pan-ready'); }
+            return;
+        }
         if (e.target.tagName === 'INPUT') return;
+        if (e.ctrlKey && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if (e.key === 'ArrowLeft')  { navigate(-1); return; }
         if (e.key === 'ArrowRight') { navigate(1);  return; }
         if (e.key === 'Delete' || e.key === 'Backspace') { clearRating(); return; }
+        if (e.key === 'Escape') { closeHelp(); return; }
+        if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
         if (e.key === 'v' || e.key === 'V') { toggleVeto(); return; }
         if (e.key === 's' || e.key === 'S') { skipImage(); return; }
+        if ((e.ctrlKey && e.key === 'z') || e.key === 'u' || e.key === 'U') { e.preventDefault(); undoSkip(); return; }
         if (e.key >= '0' && e.key <= '9') {
             applyRating(parseInt(e.key));
+        }
+    });
+
+    document.addEventListener('keyup', e => {
+        if (e.code === 'Space') {
+            isPanReady = false;
+            if (!isPanning) viewport.classList.remove('pan-ready', 'panning');
         }
     });
 
