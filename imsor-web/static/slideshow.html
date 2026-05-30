@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImSor — Slideshow</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ── Top bar ─────────────────────────────────────────────────────── */
+        #topbar {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 0 50px;
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+        }
+        #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
+        #site-nav { display: flex; gap: 14px; align-items: center; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+
+        /* ── Prev / Next in topbar ───────────────────────────────────────── */
+        #btn-prev-top, #btn-next-top {
+            padding: 5px 12px; font-size: 0.9rem;
+            border: none; border-radius: 4px; cursor: pointer;
+            background: #252545; color: #888;
+            transition: background 0.1s, color 0.1s;
+            flex-shrink: 0;
+        }
+        #btn-prev-top:hover, #btn-next-top:hover { background: #3a3a6a; color: #ddd; }
+        #btn-prev-top:disabled, #btn-next-top:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ── Play / Pause ────────────────────────────────────────────────── */
+        .play-btn {
+            padding: 4px 14px; font-size: 0.85rem;
+            border: none; border-radius: 4px; cursor: pointer;
+            background: #4a4a8a; color: #fff; white-space: nowrap;
+        }
+        .play-btn:hover { background: #5a5aaa; }
+
+        /* ── Help button ─────────────────────────────────────────────────── */
+        #help-btn {
+            position: fixed; top: 7px; right: 14px;
+            background: #333; border: none; border-radius: 50%;
+            width: 32px; height: 32px; font-size: 0.95rem; color: #ccc;
+            cursor: pointer; z-index: 99;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+        }
+        #help-btn:hover { background: #555; color: #fff; }
+
+        /* ── Help / settings panel ───────────────────────────────────────── */
+        #help-panel {
+            position: fixed; top: 0; right: 0;
+            width: 300px; height: 100vh;
+            background: #1a1a2a; border-left: 1px solid #444;
+            padding: 2em 1.5em; overflow-y: auto;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        #help-panel.open { transform: translateX(0); }
+        #help-panel h2 { font-size: 1.1rem; margin-bottom: 1.2em; color: #ddd; }
+        #help-panel h3 {
+            font-size: 0.78rem; color: #777; text-transform: uppercase;
+            letter-spacing: 0.08em; margin: 1.2em 0 0.5em;
+        }
+        #help-panel h3:first-of-type { margin-top: 0; }
+        #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
+        #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        kbd {
+            display: inline-block; background: #2a2a3a; border: 1px solid #555;
+            border-radius: 3px; padding: 1px 6px;
+            font-family: monospace; font-size: 0.78rem; color: #ccc;
+        }
+        #help-close {
+            position: absolute; top: 0.8em; right: 1em;
+            background: none; border: none; color: #777;
+            font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1;
+        }
+        #help-close:hover { color: #fff; }
+
+        /* ── Settings section inside panel ──────────────────────────────── */
+        .setting-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1.2em; }
+        .setting-row label { font-size: 0.85rem; color: #aaa; }
+        .setting-row input[type="number"] {
+            width: 80px; padding: 5px 8px; font-size: 0.9rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px; color: #e0e0e0;
+        }
+        .setting-row input[type="range"] { width: 100%; }
+        #timer-display { font-size: 0.85rem; color: #aaa; }
+        #btn-apply-filter {
+            width: 100%; padding: 7px; font-size: 0.9rem;
+            border: none; border-radius: 4px; cursor: pointer;
+            background: #4a4a8a; color: #fff; margin-top: 0.2em;
+        }
+        #btn-apply-filter:hover { background: #5a5aaa; }
+
+        /* ── Loading / done ──────────────────────────────────────────────── */
+        #loading-area {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: #aaa;
+        }
+
+        /* ── Main layout ─────────────────────────────────────────────────── */
+        #main-layout { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+
+        /* ── Image area ──────────────────────────────────────────────────── */
+        #image-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+        #main-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+            border-radius: 4px;
+        }
+
+        /* ── Progress ────────────────────────────────────────────────────── */
+        #progress {
+            position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+            font-size: 0.8rem; color: #555; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="topbar">
+        <button id="btn-prev-top">&#8592; Prev</button>
+        <span id="topbar-title">ImSor — Slideshow</span>
+        <div id="site-nav">
+            <a href="/">Home</a>
+            <a href="/annotations">Annotations</a>
+            <a href="/duplicates">Duplicates</a>
+            <a href="/rate">Rate</a>
+            <a href="/users" id="nav-users" style="display:none">Users</a>
+            <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+            <button id="btn-play" class="play-btn">Play</button>
+            <button id="btn-pause" class="play-btn" style="display:none;">Pause</button>
+        </div>
+
+        <button id="btn-next-top">Next &#8594;</button>
+        <div style="width: 46px;"></div>
+    </div>
+
+    <button id="help-btn" onclick="toggleHelp()" title="Settings &amp; help">?</button>
+
+    <div id="help-panel">
+        <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+        <h2>Settings</h2>
+
+        <div class="setting-row">
+            <label for="min-rating">Minimum rating: <span id="rating-display">7</span></label>
+            <input type="range" id="min-rating" min="0" max="9" step="0.5" value="7">
+        </div>
+        <button id="btn-apply-filter">Apply &amp; reload</button>
+
+        <div class="setting-row" style="margin-top: 1.4em;">
+            <label for="timer-interval">Speed: <span id="timer-display">5s</span></label>
+            <input type="range" id="timer-interval" min="1" max="30" value="5">
+        </div>
+
+        <h2 style="margin-top: 1.6em;">Controls</h2>
+
+        <h3>Playback</h3>
+        <table><tbody>
+            <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
+            <tr><td>Play / Pause buttons</td><td>Start or stop auto-advance</td></tr>
+        </tbody></table>
+
+        <h3>Navigation</h3>
+        <table><tbody>
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+            <tr><td>Prev / Next buttons</td><td>Previous / next image</td></tr>
+            <tr><td></td><td>Loops back to start after last image</td></tr>
+        </tbody></table>
+
+        <h3>This panel</h3>
+        <table><tbody>
+            <tr><td><kbd>?</kbd> button</td><td>Toggle this panel</td></tr>
+            <tr><td><kbd>H</kbd></td><td>Toggle this panel</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close this panel</td></tr>
+        </tbody></table>
+    </div>
+
+    <div id="loading-area"><div id="loading">Loading…</div></div>
+
+    <div id="main-layout">
+        <div id="image-area">
+            <img id="main-img" alt="">
+            <div id="progress"></div>
+        </div>
+    </div>
+
+    <script>
+    // ── Nav ────────────────────────────────────────────────────────────────
+    fetch('/api/current_user').then(r => r.json()).then(data => {
+        if (data.logged_in && data.user?.role === 'superuser') {
+            document.getElementById('nav-users').style.display = '';
+            document.getElementById('nav-admin').style.display = '';
+        }
+    }).catch(() => {});
+
+    // ── State ──────────────────────────────────────────────────────────────
+    let queue = [];
+    let currentIndex = 0;
+    let isPlaying = false;
+    let timerHandle = null;
+    const imageCache = new Map();
+
+    // ── Help panel ─────────────────────────────────────────────────────────
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
+    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+
+    // ── Persist settings ──────────────────────────────────────────────────
+    const saved = JSON.parse(localStorage.getItem('slideshow-settings') || '{}');
+    if (saved.minRating !== undefined) {
+        document.getElementById('min-rating').value = saved.minRating;
+        document.getElementById('rating-display').textContent = saved.minRating;
+    }
+    if (saved.timerInterval !== undefined) {
+        document.getElementById('timer-interval').value = saved.timerInterval;
+        document.getElementById('timer-display').textContent = saved.timerInterval + 's';
+    }
+
+    function saveSettings() {
+        localStorage.setItem('slideshow-settings', JSON.stringify({
+            minRating: document.getElementById('min-rating').value,
+            timerInterval: document.getElementById('timer-interval').value,
+        }));
+    }
+
+    document.getElementById('min-rating').addEventListener('input', (e) => {
+        document.getElementById('rating-display').textContent = e.target.value;
+        saveSettings();
+    });
+
+    // ── Timer control ──────────────────────────────────────────────────────
+    document.getElementById('timer-interval').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        document.getElementById('timer-display').textContent = val + 's';
+        saveSettings();
+        if (isPlaying) {
+            stopAutoplay();
+            startAutoplay();
+        }
+    });
+
+    // ── Play/Pause ─────────────────────────────────────────────────────────
+    function startAutoplay() {
+        isPlaying = true;
+        document.getElementById('btn-play').style.display = 'none';
+        document.getElementById('btn-pause').style.display = 'inline-block';
+        scheduleNext();
+    }
+
+    function stopAutoplay() {
+        isPlaying = false;
+        if (timerHandle) clearTimeout(timerHandle);
+        timerHandle = null;
+        document.getElementById('btn-play').style.display = 'inline-block';
+        document.getElementById('btn-pause').style.display = 'none';
+    }
+
+    function scheduleNext() {
+        if (!isPlaying) return;
+        const interval = parseInt(document.getElementById('timer-interval').value) * 1000;
+        timerHandle = setTimeout(() => {
+            if (isPlaying) {
+                const next = currentIndex < queue.length - 1 ? currentIndex + 1 : 0;
+                showImage(next);
+                scheduleNext();
+            }
+        }, interval);
+    }
+
+    document.getElementById('btn-play').addEventListener('click', startAutoplay);
+    document.getElementById('btn-pause').addEventListener('click', stopAutoplay);
+
+    // ── Filter & Load ──────────────────────────────────────────────────────
+    async function loadData() {
+        stopAutoplay();
+        closeHelp();
+        const minRating = parseFloat(document.getElementById('min-rating').value);
+        try {
+            const resp = await fetch(`/api/slideshow-queue?min_rating=${minRating}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            queue = await resp.json();
+        } catch (err) {
+            document.getElementById('loading-area').style.display = 'flex';
+            document.getElementById('loading').textContent = 'Error loading: ' + err.message;
+            return;
+        }
+
+        document.getElementById('loading-area').style.display = 'none';
+
+        if (queue.length === 0) {
+            document.getElementById('loading-area').style.display = 'flex';
+            document.getElementById('loading').textContent = 'No images match your criteria.';
+            return;
+        }
+
+        document.getElementById('main-layout').style.display = 'flex';
+        currentIndex = 0;
+        await showImage(0);
+        startAutoplay();
+    }
+
+    document.getElementById('btn-apply-filter').addEventListener('click', loadData);
+
+    // ── Image Display ──────────────────────────────────────────────────────
+    function updateStatus() {
+        document.getElementById('progress').textContent = `${currentIndex + 1} / ${queue.length}`;
+        document.getElementById('btn-prev-top').disabled = currentIndex === 0;
+        document.getElementById('btn-next-top').disabled = currentIndex === queue.length - 1;
+    }
+
+    function prefetchNext() {
+        const nextIndex = currentIndex + 1 < queue.length ? currentIndex + 1 : 0;
+        const nextId = queue[nextIndex].image_id;
+        if (!imageCache.has(nextId)) {
+            const preload = new Image();
+            preload.src = `/serve/${nextId}`;
+            imageCache.set(nextId, preload);
+        }
+    }
+
+    async function showImage(index) {
+        currentIndex = index;
+        const item = queue[index];
+        document.getElementById('main-img').src = `/serve/${item.image_id}`;
+        updateStatus();
+        prefetchNext();
+    }
+
+    // ── Navigation ─────────────────────────────────────────────────────────
+    function navigate(delta) {
+        const next = (currentIndex + delta + queue.length) % queue.length;
+        showImage(next);
+        if (isPlaying) {
+            stopAutoplay();
+            startAutoplay();
+        }
+    }
+
+    document.getElementById('btn-prev-top').addEventListener('click', () => navigate(-1));
+    document.getElementById('btn-next-top').addEventListener('click', () => navigate(1));
+
+    // ── Keyboard ───────────────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.key === 'ArrowLeft')  { navigate(-1); return; }
+        if (e.key === 'ArrowRight') { navigate(1);  return; }
+        if (e.key === 'Escape')     { closeHelp(); return; }
+        if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
+        if (e.key === ' ') { e.preventDefault(); isPlaying ? stopAutoplay() : startAutoplay(); }
+    });
+
+    // ── Boot ───────────────────────────────────────────────────────────────
+    loadData();
+    </script>
+</body>
+</html>
