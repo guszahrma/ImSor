@@ -105,6 +105,17 @@ def get_bbox_image(image_id: int) -> dict:
     return _request("GET", f"{config.server_url}/annotations/bbox-image/{image_id}").json()
 
 
+def get_rating_queue(user_id: int) -> list[dict]:
+    """Return images accessible to the user with their current slideshow_rating."""
+    return _request("GET", f"{config.server_url}/annotations/rating-queue",
+                    params={"user_id": user_id}).json()
+
+
+def get_slideshow_queue(user_id: int, min_rating: float = 7.0) -> list[dict]:
+    """Return images accessible to the user with community average rating, filtered by min_rating."""
+    return _request("GET", f"{config.server_url}/annotations/slideshow-queue",
+                    params={"user_id": user_id, "min_rating": min_rating}).json()
+
 def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()
 

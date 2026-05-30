@@ -1,11 +1,13 @@
 import json as json_mod
+import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Annotation, Image, User
+from ..models import Annotation, Camera, Image, User
 from ..schemas import AnnotationCreate, AnnotationOut, AnnotationUpdate, ClusterVoteSubmit, ImageOut
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
@@ -125,6 +127,140 @@ def bbox_image(
         "image": ImageOut.model_validate(image),
         "annotations": [AnnotationOut.model_validate(a) for a in anns],
     }
+
+
+@router.get("/rating-queue")
+def rating_queue(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(get_current_user),
+):
+    """Return images accessible to the user with their current slideshow_rating.
+    Unrated images come first, then rated ones, both sorted by image_id."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Access filter: superuser sees all, others see their camera's images
+    if user.role == "superuser":
+        images = db.query(Image).order_by(Image.id).all()
+    else:
+        user_cameras = db.query(Camera).filter(Camera.user_id == user_id).all()
+        cam_pairs = {(c.make, c.model) for c in user_cameras}
+        if not cam_pairs:
+            return []
+        conditions = [
+            and_(Image.camera_make == make, Image.camera_model == model)
+            for make, model in cam_pairs
+        ]
+        images = db.query(Image).filter(or_(*conditions)).order_by(Image.id).all()
+
+    # Exclude images that have been resolved as copies in any duplicate_role vote.
+    # A copy has duplicate_role.value != str(image.id) (value holds the keeper's id).
+    copy_image_ids: set[int] = set()
+    dup_roles = db.query(Annotation).filter(
+        Annotation.annotation_type == "duplicate_role"
+    ).all()
+    for dr in dup_roles:
+        try:
+            if int(dr.value) != dr.image_id:
+                copy_image_ids.add(dr.image_id)
+        except (ValueError, TypeError):
+            pass
+
+    images = [img for img in images if img.id not in copy_image_ids]
+
+    # Fetch this user's existing ratings
+    ratings = db.query(Annotation).filter(
+        Annotation.user_id == user_id,
+        Annotation.annotation_type == "slideshow_rating",
+    ).all()
+    rated = {r.image_id: r for r in ratings}
+
+    result = []
+    for image in images:
+        ann = rated.get(image.id)
+        result.append({
+            "image_id": image.id,
+            "rating": int(ann.value) if ann is not None else None,
+            "annotation_id": ann.id if ann is not None else None,
+        })
+
+    # Unrated first, then rated (stable order within each group)
+    result.sort(key=lambda x: (x["rating"] is not None, x["image_id"]))
+    return result
+
+
+@router.get("/slideshow-queue")
+def slideshow_queue(
+    user_id: int,
+    min_rating: float = Query(7.0),
+    db: Session = Depends(get_db),
+    _current: User = Depends(get_current_user),
+):
+    """Return images accessible to the user with community average slideshow_rating,
+    filtered by minimum average rating. Shuffled order. Excludes duplicate copies."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Access filter: superuser sees all, others see their camera's images
+    if user.role == "superuser":
+        images = db.query(Image).all()
+    else:
+        user_cameras = db.query(Camera).filter(Camera.user_id == user_id).all()
+        cam_pairs = {(c.make, c.model) for c in user_cameras}
+        if not cam_pairs:
+            return []
+        conditions = [
+            and_(Image.camera_make == make, Image.camera_model == model)
+            for make, model in cam_pairs
+        ]
+        images = db.query(Image).filter(or_(*conditions)).all()
+
+    # Exclude images that have been resolved as copies in any duplicate_role vote
+    copy_image_ids: set[int] = set()
+    dup_roles = db.query(Annotation).filter(
+        Annotation.annotation_type == "duplicate_role"
+    ).all()
+    for dr in dup_roles:
+        try:
+            if int(dr.value) != dr.image_id:
+                copy_image_ids.add(dr.image_id)
+        except (ValueError, TypeError):
+            pass
+
+    images = [img for img in images if img.id not in copy_image_ids]
+
+    # Fetch all slideshow_rating annotations (not just current user)
+    ratings = db.query(Annotation).filter(
+        Annotation.annotation_type == "slideshow_rating"
+    ).all()
+
+    # Calculate average rating per image
+    ratings_by_image: dict[int, list[int]] = {}
+    for r in ratings:
+        try:
+            val = int(r.value)
+            ratings_by_image.setdefault(r.image_id, []).append(val)
+        except (ValueError, TypeError):
+            pass
+
+    result = []
+    for image in images:
+        if image.id in ratings_by_image:
+            vals = ratings_by_image[image.id]
+            avg = sum(vals) / len(vals) if vals else None
+            if avg is not None and avg >= min_rating:
+                result.append({
+                    "image_id": image.id,
+                    "avg_rating": round(avg, 1),
+                    "rating_count": len(vals),
+                })
+
+    # Shuffle for variety
+    random.shuffle(result)
+    return result
 
 
 @router.delete("/{annotation_id}")

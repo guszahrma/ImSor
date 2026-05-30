@@ -1,6 +1,7 @@
 import random
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
@@ -54,15 +55,24 @@ def create_duplicate_pair(
     db: Session = Depends(get_db),
     _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
 ):
-    existing = db.query(DuplicatePair).filter_by(
-        image_a_id=pair.image_a_id, image_b_id=pair.image_b_id
+    # Normalise order so (a, b) and (b, a) are always stored as (min, max).
+    # This makes the idempotency check order-independent and prevents duplicate rows.
+    a_id = min(pair.image_a_id, pair.image_b_id)
+    b_id = max(pair.image_a_id, pair.image_b_id)
+
+    # Check both orderings so pre-existing un-normalised rows are also found.
+    existing = db.query(DuplicatePair).filter(
+        or_(
+            and_(DuplicatePair.image_a_id == a_id, DuplicatePair.image_b_id == b_id),
+            and_(DuplicatePair.image_a_id == b_id, DuplicatePair.image_b_id == a_id),
+        )
     ).first()
     if existing:
         return existing
 
     db_pair = DuplicatePair(
-        image_a_id=pair.image_a_id,
-        image_b_id=pair.image_b_id,
+        image_a_id=a_id,
+        image_b_id=b_id,
         match_type=pair.match_type,
     )
     db.add(db_pair)

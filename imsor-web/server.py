@@ -136,6 +136,11 @@ def users():
     return send_file(Path(__file__).parent / "static" / "users.html")
 
 
+@app.route("/rate")
+def rate_page():
+    return send_file(Path(__file__).parent / "static" / "rate.html")
+
+
 @app.route("/admin")
 def admin():
     return send_file(Path(__file__).parent / "static" / "admin.html")
@@ -274,6 +279,20 @@ def api_remove_community_granter(community_id, user_id):
     if not user or user.get("role") != "superuser":
         return jsonify({"error": "forbidden"}), 403
     return jsonify(api_client.remove_community_granter(community_id, user_id))
+
+
+@app.route("/api/rating-queue")
+def api_rating_queue():
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    user_id = user.get("id")
+    if not user_id:
+        return jsonify({"error": "user has no id"}), 400
+    try:
+        return jsonify(api_client.get_rating_queue(user_id))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/clusters")
@@ -442,6 +461,27 @@ def api_update_user_role(user_id):
     try:
         updated = api_client.update_user_role(user_id, role)
         return jsonify(updated)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/slideshow")
+def slideshow():
+    user = session.get("user")
+    if not user:
+        return redirect(url_for("index"))
+    return send_file(Path(__file__).parent / "static" / "slideshow.html")
+
+
+@app.route("/api/slideshow-queue")
+def api_slideshow_queue():
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    min_rating = request.args.get("min_rating", 7.0, type=float)
+    try:
+        queue = api_client.get_slideshow_queue(user["id"], min_rating)
+        return jsonify(queue)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
