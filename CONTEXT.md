@@ -69,6 +69,12 @@ A presentation context in which vetoed images are hidden for all users without e
 ### Community Member Rights
 A User who can see an image through Community membership may view and annotate it. They cannot extend access to others, revoke access, or delete anything.
 
+### Nomination
+Martin marking an image with any slideshow_rating value, signalling that the image is a candidate for the party slideshow. Only Nominated images appear in the rating queues of other users (Selma, her mom). Nomination carries no quality threshold — a rating of 0 is still a Nomination.
+
+### Skip
+A personal annotation (`annotation_type = "skip"`) recording that a user has consciously passed over an image and does not want it to reappear in their rating queue. A Skip carries no quality verdict and does not affect other users' queues or the slideshow. Introduced in the deadend/selmas_student_party branch; all Skip annotations should be deleted when reverting to main.
+
 ---
 
 ## Long-term Architectural Direction

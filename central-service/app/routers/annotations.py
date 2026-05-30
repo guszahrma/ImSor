@@ -1,5 +1,6 @@
 import json as json_mod
 import random
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, or_
@@ -135,60 +136,87 @@ def rating_queue(
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
-    """Return images accessible to the user with their current slideshow_rating.
-    Unrated images come first, then rated ones, both sorted by image_id."""
+    """Return images for the rating queue.
+    Superusers see all images with date_taken >= 2007-11-01.
+    Other users see only Nominated images (images any user has rated).
+    Skipped and duplicate-copy images are excluded.
+    Unrated images come first, both groups randomized."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Access filter: superuser sees all, others see their camera's images
-    if user.role == "superuser":
-        images = db.query(Image).order_by(Image.id).all()
-    else:
-        user_cameras = db.query(Camera).filter(Camera.user_id == user_id).all()
-        cam_pairs = {(c.make, c.model) for c in user_cameras}
-        if not cam_pairs:
-            return []
-        conditions = [
-            and_(Image.camera_make == make, Image.camera_model == model)
-            for make, model in cam_pairs
-        ]
-        images = db.query(Image).filter(or_(*conditions)).order_by(Image.id).all()
+    DATE_CUTOFF = datetime(2007, 11, 1)
 
-    # Exclude images that have been resolved as copies in any duplicate_role vote.
-    # A copy has duplicate_role.value != str(image.id) (value holds the keeper's id).
+    if user.role == "superuser":
+        images = db.query(Image).filter(
+            Image.date_taken.isnot(None),
+            Image.date_taken >= DATE_CUTOFF,
+        ).all()
+    else:
+        # Non-superusers see only Nominated images (any slideshow_rating exists)
+        nominated_ids = {
+            a.image_id for a in db.query(Annotation).filter(
+                Annotation.annotation_type == "slideshow_rating"
+            ).all()
+        }
+        if not nominated_ids:
+            return []
+        images = db.query(Image).filter(
+            Image.id.in_(nominated_ids),
+            Image.date_taken.isnot(None),
+            Image.date_taken >= DATE_CUTOFF,
+        ).all()
+
+    # Exclude duplicate copies
     copy_image_ids: set[int] = set()
-    dup_roles = db.query(Annotation).filter(
-        Annotation.annotation_type == "duplicate_role"
-    ).all()
-    for dr in dup_roles:
+    for dr in db.query(Annotation).filter(Annotation.annotation_type == "duplicate_role").all():
         try:
             if int(dr.value) != dr.image_id:
                 copy_image_ids.add(dr.image_id)
         except (ValueError, TypeError):
             pass
-
     images = [img for img in images if img.id not in copy_image_ids]
 
-    # Fetch this user's existing ratings
-    ratings = db.query(Annotation).filter(
-        Annotation.user_id == user_id,
-        Annotation.annotation_type == "slideshow_rating",
-    ).all()
-    rated = {r.image_id: r for r in ratings}
+    # Exclude images this user has skipped
+    skipped_ids = {
+        a.image_id for a in db.query(Annotation).filter(
+            Annotation.user_id == user_id,
+            Annotation.annotation_type == "skip",
+        ).all()
+    }
+    images = [img for img in images if img.id not in skipped_ids]
+
+    # Fetch this user's ratings and veto annotations
+    rated = {
+        r.image_id: r for r in db.query(Annotation).filter(
+            Annotation.user_id == user_id,
+            Annotation.annotation_type == "slideshow_rating",
+        ).all()
+    }
+    vetoed = {
+        v.image_id: v for v in db.query(Annotation).filter(
+            Annotation.user_id == user_id,
+            Annotation.annotation_type == "veto",
+        ).all()
+    }
 
     result = []
     for image in images:
         ann = rated.get(image.id)
+        veto = vetoed.get(image.id)
         result.append({
             "image_id": image.id,
             "rating": int(ann.value) if ann is not None else None,
             "annotation_id": ann.id if ann is not None else None,
+            "veto_annotation_id": veto.id if veto is not None else None,
         })
 
-    # Unrated first, then rated (stable order within each group)
-    result.sort(key=lambda x: (x["rating"] is not None, x["image_id"]))
-    return result
+    # Unrated first, both groups randomized
+    unrated = [r for r in result if r["rating"] is None]
+    rated_list = [r for r in result if r["rating"] is not None]
+    random.shuffle(unrated)
+    random.shuffle(rated_list)
+    return unrated + rated_list
 
 
 @router.get("/slideshow-queue")
@@ -231,6 +259,14 @@ def slideshow_queue(
             pass
 
     images = [img for img in images if img.id not in copy_image_ids]
+
+    # Exclude vetoed images (any user's veto excludes the image from slideshow)
+    vetoed_ids = {
+        a.image_id for a in db.query(Annotation).filter(
+            Annotation.annotation_type == "veto"
+        ).all()
+    }
+    images = [img for img in images if img.id not in vetoed_ids]
 
     # Fetch all slideshow_rating annotations (not just current user)
     ratings = db.query(Annotation).filter(
