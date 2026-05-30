@@ -31,7 +31,11 @@
         }
         #person-panel .hint { font-size: 0.85rem; color: #aaa; }
         #person-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-        #person-list button { padding: 3px 8px; font-size: 0.8rem; background: #3a3a6a; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+        #person-list button {
+            padding: 3px 8px; font-size: 0.8rem; background: #3a3a6a;
+            width: 100%; text-align: left; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; line-height: 1.4;
+        }
         #person-list button .shortcut {
             display: inline-block; background: #5a5aaa; color: #fff;
             font-weight: bold; width: 15px; height: 15px; line-height: 15px;
@@ -42,9 +46,22 @@
         #new-person-row input {
             padding: 5px 10px; font-size: 0.85rem;
             border: 1px solid #555; border-radius: 4px;
-            background: #1a1a2e; color: #e0e0e0; flex: 1; min-width: 0;
+            background: #1a1a2e; color: #e0e0e0; width: 100%;
         }
         #new-person-row button { padding: 5px 12px; font-size: 0.85rem; flex-shrink: 0; }
+        #name-input-wrap { position: relative; flex: 1; min-width: 0; }
+        #autocomplete-list {
+            display: none;
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+            background: #2a2a4a; border: 1px solid #555;
+            border-top: none; border-radius: 0 0 4px 4px;
+            max-height: 180px; overflow-y: auto;
+        }
+        #autocomplete-list div {
+            padding: 4px 10px; font-size: 0.82rem; cursor: pointer; color: #ddd;
+        }
+        #autocomplete-list div:hover,
+        #autocomplete-list div.ac-active { background: #4a4a8a; }
         #delete-box-btn { padding: 5px 14px; font-size: 0.85rem; width: 100%; }
 
         /* ── Right side ──────────────────────────────────────────────────── */
@@ -63,35 +80,27 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            padding: 0 50px;       /* keep clear of help-btn */
+            padding: 0 50px;
             height: 46px;
             border-bottom: 1px solid #2a2a4a;
             flex-shrink: 0;
         }
         #topbar-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            white-space: nowrap;
-            color: #ddd;
+            font-size: 1.05rem; font-weight: 600;
+            white-space: nowrap; color: #ddd;
         }
         #site-nav { display: flex; gap: 14px; }
         #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
         #site-nav a:hover { color: #fff; }
         #status {
-            position: absolute;
-            right: 50px;
-            color: #888;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            pointer-events: none;
+            position: absolute; right: 50px;
+            color: #888; font-size: 0.85rem;
+            white-space: nowrap; pointer-events: none;
         }
         #box-mode-indicator {
-            position: absolute;
-            left: 10px;
-            font-size: 0.75rem;
-            color: #666;
-            white-space: nowrap;
-            pointer-events: none;
+            position: absolute; left: 10px;
+            font-size: 0.75rem; color: #666;
+            white-space: nowrap; pointer-events: none;
         }
 
         /* ── Buttons ─────────────────────────────────────────────────────── */
@@ -109,18 +118,16 @@
         #help-btn {
             position: fixed; top: 7px; right: 14px;
             background: #333; border: none; border-radius: 50%;
-            width: 32px; height: 32px;
-            font-size: 0.95rem; color: #ccc;
+            width: 32px; height: 32px; font-size: 0.95rem; color: #ccc;
             cursor: pointer; z-index: 99;
             display: flex; align-items: center; justify-content: center;
             padding: 0;
         }
         #help-btn:hover { background: #555; color: #fff; }
 
-        /* ── Help panel — slides in from the right ───────────────────────── */
+        /* ── Help panel ──────────────────────────────────────────────────── */
         #help-panel {
-            position: fixed;
-            top: 0; right: 0;
+            position: fixed; top: 0; right: 0;
             width: 320px; height: 100vh;
             background: #1a1a2a; border-left: 1px solid #444;
             padding: 2em 1.5em; overflow-y: auto;
@@ -139,8 +146,7 @@
         #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
         #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
         kbd {
-            display: inline-block;
-            background: #2a2a3a; border: 1px solid #555;
+            display: inline-block; background: #2a2a3a; border: 1px solid #555;
             border-radius: 3px; padding: 1px 6px;
             font-family: monospace; font-size: 0.78rem; color: #ccc;
         }
@@ -155,88 +161,93 @@
         /* ── Loading area ────────────────────────────────────────────────── */
         #loading-area {
             flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            color: #aaa;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: #aaa;
         }
 
-        /* ── Main layout (image area) ────────────────────────────────────── */
-        #main-layout {
-            flex: 1;
-            overflow: hidden;
-            display: none;
-        }
+        /* ── Main layout ─────────────────────────────────────────────────── */
+        #main-layout { flex: 1; overflow: hidden; display: none; }
         #center-panel {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
         }
         #filepath {
-            font-size: 0.72rem; color: #444; margin-bottom: 4px;
+            font-size: 0.72rem; color: #444; padding: 3px 0;
             word-break: break-all; text-align: center; max-width: 90%;
+            flex-shrink: 0;
         }
+
+        /* ── Viewport (zoom / pan host) ──────────────────────────────────── */
+        #viewport {
+            flex: 1; width: 100%;
+            overflow: hidden; position: relative;
+            cursor: crosshair;
+            display: none;
+        }
+        #viewport.pan-ready { cursor: grab !important; }
+        #viewport.panning   { cursor: grabbing !important; }
+        #zoom-indicator {
+            position: absolute; bottom: 8px; right: 10px;
+            font-size: 0.75rem; color: #555;
+            pointer-events: none; z-index: 5;
+        }
+
+        /* ── Image container (carries the CSS transform) ─────────────────── */
         #image-container {
-            position: relative;
+            position: absolute; top: 0; left: 0;
             display: inline-block;
+            transform-origin: 0 0;
             cursor: crosshair;
         }
         #image-container img {
-            max-width: 100%;
-            max-height: calc(100vh - 54px);
+            display: block;
             border: 2px solid #333; border-radius: 4px;
-            display: block; background: #111;
-            pointer-events: none;
+            background: #111; pointer-events: none;
         }
 
-        /* ── Bbox visibility modes ──────────────────────────────────────── */
-        #image-container.boxes-none .bbox            { visibility: hidden; }
+        /* ── Bbox visibility modes ───────────────────────────────────────── */
+        #image-container.boxes-none .bbox { visibility: hidden; }
         #image-container.boxes-selected .bbox:not(.selected) { visibility: hidden; }
 
         /* ── Bboxes ──────────────────────────────────────────────────────── */
         .bbox {
-            position: absolute;
-            border: 2px solid #00ff88;
-            background: rgba(0, 255, 136, 0.08);
-            cursor: move;
+            position: absolute; border: 2px solid #00ff88;
+            background: rgba(0,255,136,0.08); cursor: move;
         }
-        .bbox:hover { background: rgba(0, 255, 136, 0.2); }
-        .bbox.selected { border-color: #ffcc00; background: rgba(255, 204, 0, 0.15); }
+        .bbox:hover { background: rgba(0,255,136,0.2); }
+        .bbox.selected { border-color: #ffcc00; background: rgba(255,204,0,0.15); }
         .bbox.named { border-color: #44aaff; }
         .bbox.drawing { border-color: #fff; border-style: dashed; background: rgba(255,255,255,0.05); pointer-events: none; }
         .bbox-label {
             position: absolute; top: -20px; left: 0;
             background: #00ff88; color: #000;
             font-size: 0.65rem; padding: 1px 5px;
-            border-radius: 2px; white-space: nowrap;
-            pointer-events: none;
+            border-radius: 2px; white-space: nowrap; pointer-events: none;
         }
         .bbox.named .bbox-label { background: #44aaff; }
         .bbox.selected .bbox-label { background: #ffcc00; }
         .resize-handle {
-            position: absolute;
-            width: 9px; height: 9px;
+            position: absolute; width: 9px; height: 9px;
             background: #fff; border: 1px solid #555;
             border-radius: 1px; z-index: 10;
         }
-        .resize-nw { top: -5px; left: -5px; cursor: nw-resize; }
-        .resize-ne { top: -5px; right: -5px; cursor: ne-resize; }
-        .resize-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
-        .resize-se { bottom: -5px; right: -5px; cursor: se-resize; }
+        .resize-nw { top:-5px; left:-5px; cursor:nw-resize; }
+        .resize-ne { top:-5px; right:-5px; cursor:ne-resize; }
+        .resize-sw { bottom:-5px; left:-5px; cursor:sw-resize; }
+        .resize-se { bottom:-5px; right:-5px; cursor:se-resize; }
     </style>
 </head>
 <body>
 
-    <!-- ── Person panel (full-height left column) ─────────────────────────── -->
+    <!-- ── Person panel ───────────────────────────────────────────────────── -->
     <div id="person-panel">
         <div class="hint" id="panel-hint">Click a bounding box to identify the person</div>
         <div id="person-list"></div>
         <div id="new-person-row">
-            <input id="new-person-name" type="text" placeholder="New person name">
+            <div id="name-input-wrap">
+                <input id="new-person-name" type="text" placeholder="New person name" autocomplete="off">
+                <div id="autocomplete-list"></div>
+            </div>
             <button onclick="assignNewPerson()">Add</button>
         </div>
         <button id="delete-box-btn" class="danger" onclick="deleteSelectedBox()" style="display:none;">
@@ -247,13 +258,13 @@
     <!-- ── Right side ─────────────────────────────────────────────────────── -->
     <div id="right-side">
 
-        <!-- Top bar: everything centered -->
         <div id="topbar">
             <div id="box-mode-indicator"></div>
             <span id="topbar-title">ImSor — Annotations</span>
             <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
             <div id="site-nav">
                 <a href="/">Home</a>
+                <a href="/rate">Rate</a>
                 <a href="/duplicates">Duplicates</a>
                 <a href="/users" id="nav-users" style="display:none">Users</a>
                 <a href="/admin" id="nav-admin" style="display:none">Admin</a>
@@ -264,7 +275,6 @@
 
         <button id="help-btn" onclick="toggleHelp()" title="Help (H)">?</button>
 
-        <!-- Help panel (slides in from right) -->
         <div id="help-panel">
             <button id="help-close" onclick="closeHelp()">&#x2715;</button>
             <h2>Keyboard &amp; mouse guide</h2>
@@ -272,6 +282,15 @@
             <h3>Navigation</h3>
             <table><tbody>
                 <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+            </tbody></table>
+
+            <h3>Zoom &amp; pan</h3>
+            <table><tbody>
+                <tr><td><kbd>Ctrl</kbd>+scroll</td><td>Zoom in / out (centred on cursor)</td></tr>
+                <tr><td><kbd>Space</kbd>+drag</td><td>Pan</td></tr>
+                <tr><td>Middle-drag</td><td>Pan</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Reset zoom &amp; pan</td></tr>
+                <tr><td>Double-click</td><td>Reset zoom &amp; pan</td></tr>
             </tbody></table>
 
             <h3>Bounding boxes</h3>
@@ -284,16 +303,16 @@
                 <tr><td><kbd>Esc</kbd></td><td>Deselect</td></tr>
             </tbody></table>
 
+            <h3>Visibility</h3>
+            <table><tbody>
+                <tr><td><kbd>B</kbd></td><td>Cycle boxes: all → selected only → hidden</td></tr>
+            </tbody></table>
+
             <h3>Naming a person</h3>
             <table><tbody>
                 <tr><td><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></td><td>Assign 1st–10th name from recent list</td></tr>
                 <tr><td><kbd>Enter</kbd></td><td>Focus name input — type a new name, press Enter to assign</td></tr>
                 <tr><td>Click name button</td><td>Assign that name to the selected box</td></tr>
-            </tbody></table>
-
-            <h3>Visibility</h3>
-            <table><tbody>
-                <tr><td><kbd>B</kbd></td><td>Cycle boxes: all → selected only → hidden</td></tr>
             </tbody></table>
 
             <h3>Queue</h3>
@@ -310,17 +329,18 @@
             </tbody></table>
         </div>
 
-        <!-- Loading state -->
         <div id="loading-area">
             <div id="loading">Loading...</div>
         </div>
 
-        <!-- Main content (shown after load) -->
         <div id="main-layout">
             <div id="center-panel">
                 <div id="filepath"></div>
-                <div id="image-container" style="display:none;">
-                    <img id="main-img" alt="Annotated image">
+                <div id="viewport">
+                    <div id="zoom-indicator"></div>
+                    <div id="image-container">
+                        <img id="main-img" alt="Annotated image">
+                    </div>
                 </div>
             </div>
         </div>
@@ -336,6 +356,11 @@
         }
     }).catch(() => {});
 
+    // ── DOM refs ───────────────────────────────────────────────────────────
+    const container = document.getElementById('image-container');
+    const viewport  = document.getElementById('viewport');
+    const img       = document.getElementById('main-img');
+
     // ── State ──────────────────────────────────────────────────────────────
     let queue = [];
     let currentIndex = 0;
@@ -345,30 +370,68 @@
     let currentImage = null;
     const imageCache = new Map();
 
-    let mode = null;
+    // Bbox interaction
+    let mode = null;          // null | 'drawing' | 'dragging' | 'resizing'
     let scaleX = 1, scaleY = 1;
-    let boxVisibility = 'all'; // 'all' | 'selected' | 'none'
-
-    function setBoxVisibility(mode) {
-        boxVisibility = mode;
-        container.classList.remove('boxes-none', 'boxes-selected');
-        if (mode === 'none')     container.classList.add('boxes-none');
-        if (mode === 'selected') container.classList.add('boxes-selected');
-        const labels = { all: '', selected: 'boxes: selected only', none: 'boxes: hidden' };
-        document.getElementById('box-mode-indicator').textContent = labels[mode];
-    }
-
-    function cycleBoxVisibility() {
-        const modes = ['all', 'selected', 'none'];
-        setBoxVisibility(modes[(modes.indexOf(boxVisibility) + 1) % 3]);
-    }
     let drawState = null;
     let dragState = null;
     let resizeState = null;
     let previewEl = null;
 
-    const container = document.getElementById('image-container');
-    const img = document.getElementById('main-img');
+    // Bbox visibility
+    let boxVisibility = 'all'; // 'all' | 'selected' | 'none'
+
+    // Zoom / pan
+    let zoom = 1;
+    let panX = 0, panY = 0;
+    let isPanReady = false, isPanning = false;
+    let panStart = null;
+
+    // ── Zoom / pan helpers ─────────────────────────────────────────────────
+
+    function applyTransform() {
+        container.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
+        const pct = Math.round(zoom * 100);
+        document.getElementById('zoom-indicator').textContent = pct === 100 ? '' : `${pct}%`;
+    }
+
+    function resetZoom() {
+        zoom = 1;
+        panX = Math.max(0, (viewport.clientWidth  - img.clientWidth)  / 2);
+        panY = Math.max(0, (viewport.clientHeight - img.clientHeight) / 2);
+        applyTransform();
+    }
+
+    // Ctrl+Wheel — zoom centred on cursor
+    viewport.addEventListener('wheel', e => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const vx = e.clientX - rect.left;
+        const vy = e.clientY - rect.top;
+        // point in container space under cursor
+        const cx = (vx - panX) / zoom;
+        const cy = (vy - panY) / zoom;
+        // smooth continuous zoom
+        const delta = e.deltaMode === 1 ? e.deltaY * 20 : e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY;
+        zoom = Math.max(0.25, Math.min(16, zoom * Math.pow(0.999, delta)));
+        // re-anchor cursor point
+        panX = vx - cx * zoom;
+        panY = vy - cy * zoom;
+        applyTransform();
+    }, { passive: false });
+
+    // Double-click — reset zoom
+    viewport.addEventListener('dblclick', e => {
+        if (!e.target.closest('.bbox')) resetZoom();
+    });
+
+    function startPan(e) {
+        isPanning = true;
+        panStart = { x: e.clientX, y: e.clientY, px: panX, py: panY };
+        viewport.classList.remove('pan-ready');
+        viewport.classList.add('panning');
+    }
 
     // ── Data fetching ──────────────────────────────────────────────────────
 
@@ -412,7 +475,7 @@
         }
 
         document.getElementById('main-layout').style.display = 'block';
-        document.getElementById('image-container').style.display = 'inline-block';
+        document.getElementById('viewport').style.display = 'block';
         updateStatus();
         await showImage(0);
     }
@@ -444,12 +507,22 @@
 
         currentImage = data.image;
         currentAnnotations = data.annotations;
-
         document.getElementById('filepath').textContent = currentImage.file_path;
 
         img.onload = function () {
-            scaleX = img.clientWidth  / (currentImage.image_width  || img.naturalWidth);
-            scaleY = img.clientHeight / (currentImage.image_height || img.naturalHeight);
+            // Fit image into viewport at zoom=1
+            const natW = img.naturalWidth;
+            const natH = img.naturalHeight;
+            const vpW  = viewport.clientWidth  - 4;
+            const vpH  = viewport.clientHeight - 4;
+            const fit  = Math.min(1, vpW / natW, vpH / natH);
+            img.style.width  = Math.round(natW * fit) + 'px';
+            img.style.height = Math.round(natH * fit) + 'px';
+
+            scaleX = img.clientWidth  / (currentImage.image_width  || natW);
+            scaleY = img.clientHeight / (currentImage.image_height || natH);
+
+            resetZoom();
             renderBoxes();
             autoSelectFirstUnnamed();
         };
@@ -461,9 +534,7 @@
 
     function renderBoxes() {
         container.querySelectorAll('.bbox').forEach(el => el.remove());
-        for (const ann of currentAnnotations) {
-            addBoxElement(ann);
-        }
+        for (const ann of currentAnnotations) addBoxElement(ann);
     }
 
     function addBoxElement(ann) {
@@ -553,6 +624,10 @@
     // ── Mouse interaction ──────────────────────────────────────────────────
 
     container.addEventListener('mousedown', e => {
+        // Middle-click or Space+left-click → pan
+        if (e.button === 1 || (e.button === 0 && isPanReady)) {
+            startPan(e); e.preventDefault(); return;
+        }
         if (e.button !== 0) return;
 
         const handleEl = e.target.closest('.resize-handle');
@@ -562,10 +637,7 @@
             startResize(handleEl, bboxEl, e);
         } else if (bboxEl) {
             const ann = currentAnnotations.find(a => a.id === parseInt(bboxEl.dataset.annId));
-            if (ann) {
-                selectBox(ann, bboxEl);
-                startDrag(ann, bboxEl, e);
-            }
+            if (ann) { selectBox(ann, bboxEl); startDrag(ann, bboxEl, e); }
         } else {
             deselectAll();
             startDraw(e);
@@ -599,12 +671,9 @@
 
     function startDraw(e) {
         const rect = img.getBoundingClientRect();
-        const dx = e.clientX - rect.left;
-        const dy = e.clientY - rect.top;
-        drawState = {
-            startDispX: dx, startDispY: dy,
-            startStoredX: dx / scaleX, startStoredY: dy / scaleY,
-        };
+        const dx = (e.clientX - rect.left) / zoom;
+        const dy = (e.clientY - rect.top)  / zoom;
+        drawState = { startDispX: dx, startDispY: dy };
         previewEl = document.createElement('div');
         previewEl.className = 'bbox drawing';
         previewEl.style.cssText = `left:${dx}px;top:${dy}px;width:0;height:0;`;
@@ -613,18 +682,25 @@
     }
 
     document.addEventListener('mousemove', e => {
+        if (isPanning) {
+            panX = panStart.px + (e.clientX - panStart.x);
+            panY = panStart.py + (e.clientY - panStart.y);
+            applyTransform();
+            return;
+        }
+
         if (mode === 'dragging') {
             const ds = dragState;
-            const newX = Math.max(0, ds.origX + (e.clientX - ds.startMouseX) / scaleX);
-            const newY = Math.max(0, ds.origY + (e.clientY - ds.startMouseY) / scaleY);
+            const newX = Math.max(0, ds.origX + (e.clientX - ds.startMouseX) / scaleX / zoom);
+            const newY = Math.max(0, ds.origY + (e.clientY - ds.startMouseY) / scaleY / zoom);
             ds.boxEl.style.left = (newX * scaleX) + 'px';
             ds.boxEl.style.top  = (newY * scaleY) + 'px';
             ds.curX = newX; ds.curY = newY;
 
         } else if (mode === 'resizing') {
             const rs = resizeState;
-            const dx = (e.clientX - rs.startMouseX) / scaleX;
-            const dy = (e.clientY - rs.startMouseY) / scaleY;
+            const dx = (e.clientX - rs.startMouseX) / scaleX / zoom;
+            const dy = (e.clientY - rs.startMouseY) / scaleY / zoom;
             const minSz = 10 / Math.min(scaleX, scaleY);
             let {origX: x, origY: y, origW: w, origH: h} = rs;
 
@@ -638,7 +714,6 @@
                 const ny = Math.min(y + dy, y + h - minSz);
                 h = h - (ny - y); y = ny;
             }
-
             rs.boxEl.style.left   = (x * scaleX) + 'px';
             rs.boxEl.style.top    = (y * scaleY) + 'px';
             rs.boxEl.style.width  = (w * scaleX) + 'px';
@@ -647,19 +722,26 @@
 
         } else if (mode === 'drawing' && drawState) {
             const rect = img.getBoundingClientRect();
-            const ex = Math.max(0, Math.min(e.clientX - rect.left, img.clientWidth));
-            const ey = Math.max(0, Math.min(e.clientY - rect.top,  img.clientHeight));
+            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
+            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
             const left   = Math.min(ex, drawState.startDispX);
             const top    = Math.min(ey, drawState.startDispY);
-            const width  = Math.abs(ex - drawState.startDispX);
-            const height = Math.abs(ey - drawState.startDispY);
-            previewEl.style.left = left + 'px'; previewEl.style.top  = top + 'px';
-            previewEl.style.width = width + 'px'; previewEl.style.height = height + 'px';
+            previewEl.style.left   = left + 'px';
+            previewEl.style.top    = top  + 'px';
+            previewEl.style.width  = Math.abs(ex - drawState.startDispX) + 'px';
+            previewEl.style.height = Math.abs(ey - drawState.startDispY) + 'px';
             drawState.endDispX = ex; drawState.endDispY = ey;
         }
     });
 
     document.addEventListener('mouseup', async e => {
+        if (isPanning) {
+            isPanning = false;
+            viewport.classList.remove('panning');
+            if (isPanReady) viewport.classList.add('pan-ready');
+            return;
+        }
+
         if (mode === 'dragging') {
             const ds = dragState;
             mode = null; dragState = null;
@@ -678,21 +760,18 @@
         } else if (mode === 'drawing') {
             mode = null;
             if (previewEl) { previewEl.remove(); previewEl = null; }
-            const ds = drawState;
-            drawState = null;
+            const ds = drawState; drawState = null;
             if (!ds) return;
 
             const rect = img.getBoundingClientRect();
-            const ex = Math.max(0, Math.min(e.clientX - rect.left, img.clientWidth));
-            const ey = Math.max(0, Math.min(e.clientY - rect.top,  img.clientHeight));
+            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
+            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
             const left   = Math.min(ex, ds.startDispX) / scaleX;
             const top    = Math.min(ey, ds.startDispY) / scaleY;
             const width  = Math.abs(ex - ds.startDispX) / scaleX;
             const height = Math.abs(ey - ds.startDispY) / scaleY;
 
-            if (width > 5 && height > 5) {
-                await createNewBox(left, top, width, height);
-            }
+            if (width > 5 && height > 5) await createNewBox(left, top, width, height);
         }
     });
 
@@ -725,17 +804,12 @@
             if (!resp.ok) throw new Error(await resp.text());
             ann = await resp.json();
         } catch (err) {
-            alert('Error creating box: ' + err.message);
-            return;
+            alert('Error creating box: ' + err.message); return;
         }
-
         currentAnnotations.push(ann);
         imageCache.delete(currentImage.id);
-
-        const item = queue[currentIndex];
-        item.unnamed_count++;
+        queue[currentIndex].unnamed_count++;
         updateStatus();
-
         const boxEl = addBoxElement(ann);
         selectBox(ann, boxEl);
         if (boxVisibility !== 'all') setBoxVisibility('selected');
@@ -747,23 +821,18 @@
         const ann = selectedAnn;
         const val = JSON.parse(ann.value);
         const wasUnnamed = !val.person_name;
-
         try {
             const resp = await fetch(`/api/annotations/${ann.id}`, {method: 'DELETE'});
             if (!resp.ok) throw new Error(await resp.text());
         } catch (err) {
-            alert('Error deleting box: ' + err.message);
-            return;
+            alert('Error deleting box: ' + err.message); return;
         }
-
         selectedAnn = null;
         currentAnnotations = currentAnnotations.filter(a => a.id !== ann.id);
         imageCache.delete(currentImage.id);
-
         const item = queue[currentIndex];
         if (wasUnnamed) item.unnamed_count--;
         else item.named_count--;
-
         if (item.unnamed_count === 0 || currentAnnotations.length === 0) {
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
@@ -782,7 +851,6 @@
         const wasUnnamed = !val.person_name;
         val.person_name = name;
         const newValue = JSON.stringify(val);
-
         try {
             await fetch(`/api/annotations/${selectedAnn.id}`, {
                 method: 'PATCH',
@@ -790,22 +858,14 @@
                 body: JSON.stringify({value: newValue}),
             });
         } catch (err) {
-            alert('Error saving: ' + err.message);
-            return;
+            alert('Error saving: ' + err.message); return;
         }
-
         selectedAnn.value = newValue;
         imageCache.delete(currentImage.id);
-
         const idx = knownPeople.indexOf(name);
-        if (idx !== 0) {
-            if (idx > 0) knownPeople.splice(idx, 1);
-            knownPeople.unshift(name);
-        }
-
+        if (idx !== 0) { if (idx > 0) knownPeople.splice(idx, 1); knownPeople.unshift(name); }
         const item = queue[currentIndex];
         if (wasUnnamed) { item.unnamed_count--; item.named_count++; }
-
         if (item.unnamed_count === 0) {
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
@@ -817,17 +877,17 @@
             autoSelectFirstUnnamed();
             updateStatus();
         }
-
         document.body.focus();
     }
 
     async function assignNewPerson() {
-        const input = document.getElementById('new-person-name');
-        const name = input.value.trim();
-        if (!name || !selectedAnn) return;
-        input.value = '';
-        input.blur();
-        await assignPerson(name);
+        const typed = nameInput.value.trim();
+        if (!typed || !selectedAnn) return;
+        // Reuse the canonical spelling if the name already exists (case-insensitive)
+        const canonical = knownPeople.find(n => n.toLowerCase() === typed.toLowerCase()) ?? typed;
+        nameInput.value = '';
+        acList.style.display = 'none'; acIndex = -1;
+        await assignPerson(canonical);
     }
 
     function showDone() {
@@ -853,19 +913,95 @@
         if (el) selectBox(nextAnn, el);
     }
 
+    // ── Bbox visibility ────────────────────────────────────────────────────
+
+    function setBoxVisibility(mode) {
+        boxVisibility = mode;
+        container.classList.remove('boxes-none', 'boxes-selected');
+        if (mode === 'none')     container.classList.add('boxes-none');
+        if (mode === 'selected') container.classList.add('boxes-selected');
+        const labels = { all: '', selected: 'boxes: selected only', none: 'boxes: hidden' };
+        document.getElementById('box-mode-indicator').textContent = labels[mode];
+    }
+
+    function cycleBoxVisibility() {
+        const modes = ['all', 'selected', 'none'];
+        setBoxVisibility(modes[(modes.indexOf(boxVisibility) + 1) % 3]);
+    }
+
     // ── Keyboard ───────────────────────────────────────────────────────────
 
-    document.getElementById('new-person-name').addEventListener('keydown', e => {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const input = document.getElementById('new-person-name');
-        input.blur();
-        if (input.value.trim()) assignNewPerson();
-        else selectNextBox();
+    // ── Autocomplete ───────────────────────────────────────────────────────
+    const nameInput = document.getElementById('new-person-name');
+    const acList    = document.getElementById('autocomplete-list');
+    let acIndex = -1;
+
+    function acShow() {
+        const q = nameInput.value.trim().toLowerCase();
+        acList.innerHTML = '';
+        acIndex = -1;
+        if (!q) { acList.style.display = 'none'; return; }
+        const matches = knownPeople.filter(n => n.toLowerCase().includes(q));
+        if (!matches.length) { acList.style.display = 'none'; return; }
+        matches.forEach(name => {
+            const div = document.createElement('div');
+            div.textContent = name;
+            div.addEventListener('mousedown', e => {
+                e.preventDefault();   // keep input focused
+                nameInput.value = name;
+                acList.style.display = 'none';
+                acIndex = -1;
+                assignNewPerson();
+            });
+            acList.appendChild(div);
+        });
+        acList.style.display = 'block';
+    }
+
+    function acHighlight(idx) {
+        const items = acList.querySelectorAll('div');
+        acIndex = Math.max(-1, Math.min(idx, items.length - 1));
+        items.forEach((el, i) => el.classList.toggle('ac-active', i === acIndex));
+        if (acIndex >= 0) nameInput.value = items[acIndex].textContent;
+    }
+
+    nameInput.addEventListener('input', acShow);
+    nameInput.addEventListener('blur', () => setTimeout(() => { acList.style.display = 'none'; acIndex = -1; }, 150));
+
+    nameInput.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (acList.style.display !== 'none') acHighlight(acIndex + 1);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (acList.style.display !== 'none') acHighlight(acIndex - 1);
+            return;
+        }
+        if (e.key === 'Escape') {
+            acList.style.display = 'none'; acIndex = -1;
+            return;  // document handler skips INPUT targets so no further side-effects
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            acList.style.display = 'none'; acIndex = -1;
+            nameInput.blur();
+            if (nameInput.value.trim()) assignNewPerson();
+            else selectNextBox();
+        }
     });
 
     document.addEventListener('keydown', e => {
+        // Space — pan mode (suppress default scroll)
+        if (e.code === 'Space') {
+            if (e.target.tagName === 'INPUT') return;
+            e.preventDefault();
+            if (!isPanReady) { isPanReady = true; viewport.classList.add('pan-ready'); }
+            return;
+        }
         if (e.target.tagName === 'INPUT') return;
+
         if (e.key === 'ArrowLeft')  { navigate(-1); return; }
         if (e.key === 'ArrowRight') { navigate(1);  return; }
         if (e.key === 'Escape') {
@@ -874,19 +1010,24 @@
         }
         if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
         if (e.key === 'b' || e.key === 'B') { cycleBoxVisibility(); return; }
+        if (e.ctrlKey && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnn) {
-            e.preventDefault();
-            deleteSelectedBox();
-            return;
+            e.preventDefault(); deleteSelectedBox(); return;
         }
         if (e.key === 'Enter' && selectedAnn) {
             e.preventDefault();
-            document.getElementById('new-person-name').focus();
-            return;
+            document.getElementById('new-person-name').focus(); return;
         }
         if (selectedAnn && e.key >= '0' && e.key <= '9') {
             const idx = e.key === '0' ? 9 : parseInt(e.key) - 1;
             if (idx < knownPeople.length) assignPerson(knownPeople[idx]);
+        }
+    });
+
+    document.addEventListener('keyup', e => {
+        if (e.code === 'Space') {
+            isPanReady = false;
+            if (!isPanning) viewport.classList.remove('pan-ready', 'panning');
         }
     });
 
