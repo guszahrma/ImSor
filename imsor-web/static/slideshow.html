@@ -112,6 +112,20 @@
         }
         #btn-apply-filter:hover { background: #5a5aaa; }
 
+        /* ── Age display ─────────────────────────────────────────────────── */
+        #age-display {
+            position: fixed; left: 0; top: 46px; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; z-index: 10; overflow: hidden;
+        }
+        #age-display span {
+            font-size: 60px; font-weight: 500;
+            color: rgba(180, 180, 220, 0.65);
+            text-align: center;
+            white-space: pre-line;
+            line-height: 1.1;
+        }
+
         /* ── Loading / done ──────────────────────────────────────────────── */
         #loading-area {
             flex: 1; display: flex; align-items: center; justify-content: center;
@@ -205,6 +219,7 @@
         </tbody></table>
     </div>
 
+    <div id="age-display"><span id="age-text"></span></div>
     <div id="loading-area"><div id="loading">Loading…</div></div>
 
     <div id="main-layout">
@@ -351,9 +366,16 @@
     async function showImage(index) {
         currentIndex = index;
         const item = queue[index];
-        document.getElementById('main-img').src = `/serve/${item.image_id}`;
+        const imgEl = document.getElementById('main-img');
+        imgEl.onload = function() {
+            const rect = imgEl.getBoundingClientRect();
+            const el = document.getElementById('age-display');
+            el.style.width = Math.max(0, rect.left) + 'px';
+        };
+        imgEl.src = `/serve/${item.image_id}`;
         updateStatus();
         prefetchNext();
+        updateAgeDisplay(item.date_taken);
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -379,7 +401,44 @@
         if (e.key === ' ') { e.preventDefault(); isPlaying ? stopAutoplay() : startAutoplay(); }
     });
 
+    // ── Age display ────────────────────────────────────────────────────────
+    let selmaBirthdate = null;
+
+    function computeAge(birthdate, dateTaken) {
+        if (!birthdate || !dateTaken) return null;
+        const birth = new Date(birthdate);
+        const taken = new Date(dateTaken);
+        if (taken < birth) return null;
+        let years  = taken.getFullYear() - birth.getFullYear();
+        let months = taken.getMonth()    - birth.getMonth();
+        let days   = taken.getDate()     - birth.getDate();
+        if (days < 0) {
+            months--;
+            days += new Date(taken.getFullYear(), taken.getMonth(), 0).getDate();
+        }
+        if (months < 0) { years--; months += 12; }
+        if (years < 3)  return `${years} y\n${months} m\n${days} d`;
+        if (years < 10) return `${years} y\n${months} m`;
+        return `${years} y`;
+    }
+
+    function updateAgeDisplay(dateTaken) {
+        document.getElementById('age-text').textContent =
+            computeAge(selmaBirthdate, dateTaken) ?? '';
+    }
+
+    async function loadSelmasBirthdate() {
+        try {
+            const resp = await fetch('/api/admin/persons');
+            if (!resp.ok) return;
+            const persons = await resp.json();
+            const selma = persons.find(p => p.name === 'Selma Zahr');
+            if (selma) selmaBirthdate = selma.birthdate;
+        } catch (_) {}
+    }
+
     // ── Boot ───────────────────────────────────────────────────────────────
+    loadSelmasBirthdate();
     loadData();
     </script>
 </body>

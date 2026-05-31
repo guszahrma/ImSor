@@ -139,12 +139,15 @@ def delete_camera(camera_id: int) -> dict:
 def get_person_names() -> list[str]:
     return _request("GET", f"{config.server_url}/admin/person-names").json()
 
+def get_persons() -> list[dict]:
+    return _request("GET", f"{config.server_url}/admin/persons").json()
+
 def get_person_links() -> list[dict]:
     return _request("GET", f"{config.server_url}/admin/person-links").json()
 
 def create_person_link(person_name: str, user_id: int) -> dict:
     return _request("POST", f"{config.server_url}/admin/person-links",
-                    json={"person_name": person_name, "user_id": user_id}).json()
+                    json={"name": person_name, "user_id": user_id}).json()
 
 def delete_person_link(link_id: int) -> dict:
     return _request("DELETE", f"{config.server_url}/admin/person-links/{link_id}").json()

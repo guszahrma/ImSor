@@ -69,8 +69,11 @@ A Photographer or Superuser extending visibility of images to a Community. Commu
 ### Veto
 An annotated User's opt-out from having images containing them shared beyond the Photographer and Superuser. A Veto is image-level — one person vetoing an image removes it from all community-visible contexts for all users. The Photographer and Superuser can still view vetoed images in normal mode. Vetoed images are hidden for everyone without exception in Slideshow mode.
 
+### Person
+A named individual who appears in images. Stored as a first-class record with a name, an optional birthdate, and an optional link to a User account. Person absorbs the former PersonUserLink table — the user link is now a nullable field on Person rather than a separate join table. A Person with a linked User account is an Annotated User. A Person may have a birthdate without having a User account, and vice versa.
+
 ### Annotated User
-A User who has been linked by a Superuser to a person name that appears in person_bbox annotations. Annotated Users may Veto images they appear in. The mechanism by which Annotated Users revoke broader access is to be detailed.
+A User who has been linked by a Superuser to a Person record. Annotated Users may Veto images they appear in. The mechanism by which Annotated Users revoke broader access is to be detailed.
 
 ### Slideshow Mode
 A presentation context in which vetoed images are hidden for all users without exception — including Superusers and Photographers. Privacy is absolute in this mode.

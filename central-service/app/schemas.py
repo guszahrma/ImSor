@@ -169,14 +169,16 @@ class CameraOut(BaseModel):
 
 # --- Admin: Person-User Links ---
 
-class PersonUserLinkCreate(BaseModel):
-    person_name: str
-    user_id: int
+class PersonCreate(BaseModel):
+    name: str
+    user_id: int | None = None
+    birthdate: datetime.date | None = None
 
-class PersonUserLinkOut(BaseModel):
+class PersonOut(BaseModel):
     id: int
-    person_name: str
-    user_id: int
+    name: str
+    birthdate: datetime.date | None
+    user_id: int | None
     created_at: datetime.datetime
     model_config = {"from_attributes": True}
 

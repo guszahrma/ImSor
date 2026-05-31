@@ -225,6 +225,7 @@ def rating_queue(
             "exif_orientation": image.exif_orientation or 0,
             "rotation_correction": int(rot.value) if rot is not None else 0,
             "bookmark_annotation_id": bm.id if bm is not None else None,
+            "date_taken": image.date_taken.isoformat() if image.date_taken else None,
         })
 
     # Unrated first, both groups randomized
@@ -308,6 +309,7 @@ def slideshow_queue(
                     "image_id": image.id,
                     "avg_rating": round(avg, 1),
                     "rating_count": len(vals),
+                    "date_taken": image.date_taken.isoformat() if image.date_taken else None,
                 })
 
     # Shuffle for variety

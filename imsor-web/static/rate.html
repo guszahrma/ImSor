@@ -79,6 +79,20 @@
             pointer-events: none; z-index: 5;
         }
 
+        /* ── Age display ─────────────────────────────────────────────────── */
+        #age-display {
+            position: fixed; left: 0; top: 46px; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; z-index: 10; overflow: hidden;
+        }
+        #age-display span {
+            font-size: 60px; font-weight: 500;
+            color: rgba(180, 180, 220, 0.65);
+            text-align: center;
+            white-space: pre-line;
+            line-height: 1.1;
+        }
+
         /* ── Image container (carries the CSS transform) ─────────────────── */
         #image-container {
             position: absolute; top: 0; left: 0;
@@ -290,6 +304,7 @@
         </tbody></table>
     </div>
 
+    <div id="age-display"><span id="age-text"></span></div>
     <div id="loading-area"><div id="loading">Loading…</div></div>
 
     <div id="main-layout">
@@ -345,6 +360,13 @@
         applyTransform();
     }
 
+    function updateAgePosition() {
+        const rect = container.getBoundingClientRect();
+        const w = Math.max(0, rect.left);
+        const el = document.getElementById('age-display');
+        el.style.width = w + 'px';
+    }
+
     function applyRotationLayout() {
         const natW = img.naturalWidth;
         const natH = img.naturalHeight;
@@ -362,6 +384,7 @@
         img.style.height = (rot90 ? displayW : displayH) + 'px';
         img.style.transform = `translate(-50%, -50%) rotate(${rotationDeg}deg)`;
         resetZoom();
+        updateAgePosition();
     }
 
     viewport.addEventListener('wheel', e => {
@@ -517,6 +540,7 @@
         renderVeto(item.veto_annotation_id !== null);
         renderBookmark(!!item.bookmark_annotation_id);
         updateRotationIndicator();
+        updateAgeDisplay(item.date_taken);
         updateStatus();
         prefetchNext();
     }
@@ -736,7 +760,44 @@
         }
     });
 
+    // ── Age display ────────────────────────────────────────────────────────
+    let selmaBirthdate = null;
+
+    function computeAge(birthdate, dateTaken) {
+        if (!birthdate || !dateTaken) return null;
+        const birth = new Date(birthdate);
+        const taken = new Date(dateTaken);
+        if (taken < birth) return null;
+        let years  = taken.getFullYear() - birth.getFullYear();
+        let months = taken.getMonth()    - birth.getMonth();
+        let days   = taken.getDate()     - birth.getDate();
+        if (days < 0) {
+            months--;
+            days += new Date(taken.getFullYear(), taken.getMonth(), 0).getDate();
+        }
+        if (months < 0) { years--; months += 12; }
+        if (years < 3)  return `${years} y\n${months} m\n${days} d`;
+        if (years < 10) return `${years} y\n${months} m`;
+        return `${years} y`;
+    }
+
+    function updateAgeDisplay(dateTaken) {
+        document.getElementById('age-text').textContent =
+            computeAge(selmaBirthdate, dateTaken) ?? '';
+    }
+
+    async function loadSelmasBirthdate() {
+        try {
+            const resp = await fetch('/api/admin/persons');
+            if (!resp.ok) return;
+            const persons = await resp.json();
+            const selma = persons.find(p => p.name === 'Selma Zahr');
+            if (selma) selmaBirthdate = selma.birthdate;
+        } catch (_) {}
+    }
+
     // ── Boot ───────────────────────────────────────────────────────────────
+    loadSelmasBirthdate();
     loadData();
     </script>
 </body>

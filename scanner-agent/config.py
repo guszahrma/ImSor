@@ -1,6 +1,6 @@
 # Scanner Agent configuration
 
-from credentials import username, password
+from credentials import central_service_username as username, central_service_password as password
 
 # Central Web Service URLs per environment
 server_urls = {

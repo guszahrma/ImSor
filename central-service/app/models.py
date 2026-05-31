@@ -1,6 +1,6 @@
 import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Text,
+    Column, Integer, String, Float, DateTime, Date, ForeignKey, Text,
     UniqueConstraint, Boolean,
 )
 from sqlalchemy.orm import relationship
@@ -21,7 +21,7 @@ class User(Base):
     annotations = relationship("Annotation", back_populates="user")
     sharing_decisions = relationship("SharingPermission", back_populates="user")
     cameras = relationship("Camera", back_populates="user", cascade="all, delete-orphan")
-    person_links = relationship("PersonUserLink", back_populates="user", cascade="all, delete-orphan")
+    persons = relationship("Person", back_populates="user")
     created_communities = relationship("Community", back_populates="creator", cascade="all, delete-orphan")
 
 
@@ -99,18 +99,19 @@ class Camera(Base):
     )
 
 
-class PersonUserLink(Base):
-    __tablename__ = "person_user_links"
+class Person(Base):
+    __tablename__ = "persons"
 
     id = Column(Integer, primary_key=True, index=True)
-    person_name = Column(String(200), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    birthdate = Column(Date, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    user = relationship("User", back_populates="person_links")
+    user = relationship("User", back_populates="persons")
 
     __table_args__ = (
-        UniqueConstraint("person_name", name="uq_person_name"),
+        UniqueConstraint("name", name="uq_persons_name"),
     )
 
 

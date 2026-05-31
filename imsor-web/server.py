@@ -19,7 +19,6 @@ if _ssl_ops:
 
 sys.path.append(str(Path(__file__).parent.parent / "auto-annotator"))
 
-import credentials
 from flask_dance.consumer import oauth_authorized
 from flask import flash
 from flask import Flask, jsonify, request, send_file, abort, redirect, url_for, session
@@ -57,8 +56,8 @@ def api_current_user():
 
 # Google OAuth setup
 google_bp = make_google_blueprint(
-    client_id=credentials.GOOGLE_CLIENT_ID,
-    client_secret=credentials.GOOGLE_CLIENT_SECRET,
+    client_id=config.google_client_id,
+    client_secret=config.google_client_secret,
     scope=[
         "openid",
         "https://www.googleapis.com/auth/userinfo.profile",
@@ -185,6 +184,17 @@ def api_person_names():
     if not user or user.get("role") != "superuser":
         return jsonify({"error": "forbidden"}), 403
     return jsonify(api_client.get_person_names())
+
+
+@app.route("/api/admin/persons", methods=["GET"])
+def api_get_persons():
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        return jsonify(api_client.get_persons())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/admin/person-links", methods=["GET"])

@@ -1,6 +1,13 @@
 # ImSor Web configuration
 
-from credentials import username, password
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from credentials import (
+    central_service_username as username,
+    central_service_password as password,
+    google_client_id,
+    google_client_secret,
+)
 
 server_url = "http://localhost:8000"
 

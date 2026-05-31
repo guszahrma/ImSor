@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..auth import require_role
 from ..database import get_db
-from ..models import User, Camera, PersonUserLink, Annotation, Image
-from ..schemas import CameraCreate, CameraOut, PersonUserLinkCreate, PersonUserLinkOut, UserOut
+from ..models import User, Camera, Person, Annotation, Image
+from ..schemas import CameraCreate, CameraOut, PersonCreate, PersonOut, UserOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -90,29 +90,43 @@ def list_person_names(
     return sorted(names)
 
 
-@router.get("/person-links", response_model=list[PersonUserLinkOut])
+@router.get("/persons", response_model=list[PersonOut])
+def list_persons(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    return db.query(Person).order_by(Person.name).all()
+
+
+@router.get("/person-links", response_model=list[PersonOut])
 def list_person_links(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_role("superuser")),
 ):
-    return db.query(PersonUserLink).all()
+    return db.query(Person).filter(Person.user_id.isnot(None)).all()
 
 
-@router.post("/person-links", response_model=PersonUserLinkOut)
+@router.post("/person-links", response_model=PersonOut)
 def create_person_link(
-    data: PersonUserLinkCreate,
+    data: PersonCreate,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_role("superuser")),
 ):
-    link = PersonUserLink(person_name=data.person_name, user_id=data.user_id)
-    db.add(link)
+    existing = db.query(Person).filter(Person.name == data.name).first()
+    if existing:
+        existing.user_id = data.user_id
+        db.commit()
+        db.refresh(existing)
+        return existing
+    person = Person(name=data.name, user_id=data.user_id)
+    db.add(person)
     try:
         db.commit()
-        db.refresh(link)
+        db.refresh(person)
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Link already exists")
-    return link
+        raise HTTPException(status_code=400, detail="Person already exists")
+    return person
 
 
 @router.delete("/person-links/{link_id}")
@@ -121,10 +135,10 @@ def delete_person_link(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_role("superuser")),
 ):
-    link = db.query(PersonUserLink).filter(PersonUserLink.id == link_id).first()
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-    db.delete(link)
+    person = db.query(Person).filter(Person.id == link_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    person.user_id = None
     db.commit()
     return {"detail": "Deleted"}
 
