@@ -73,6 +73,11 @@
             font-size: 0.75rem; color: #555;
             pointer-events: none; z-index: 5;
         }
+        #rotation-indicator {
+            position: absolute; bottom: 26px; right: 10px;
+            font-size: 0.75rem; color: #7a7aaa;
+            pointer-events: none; z-index: 5;
+        }
 
         /* ── Image container (carries the CSS transform) ─────────────────── */
         #image-container {
@@ -80,7 +85,15 @@
             display: inline-block;
             transform-origin: 0 0;
         }
-        #image-container img { display: block; border-radius: 4px; }
+        /* ── Rotation box (sized to visual dimensions after rotation) ──────── */
+        #rot-box { position: relative; }
+        #rot-box img {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform-origin: center center;
+            display: block;
+            border-radius: 4px;
+        }
 
         /* ── Rating bar ──────────────────────────────────────────────────── */
         #rating-bar {
@@ -253,6 +266,11 @@
             <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>U</kbd></td><td>Undo last skip</td></tr>
         </tbody></table>
 
+        <h3>Rotation</h3>
+        <table><tbody>
+            <tr><td><kbd>R</kbd></td><td>Rotate 90° clockwise — cycles back to 0° after 270°</td></tr>
+        </tbody></table>
+
         <h3>This panel</h3>
         <table><tbody>
             <tr><td><kbd>H</kbd></td><td>Toggle this panel</td></tr>
@@ -266,8 +284,11 @@
         <div id="image-area">
             <div id="viewport">
                 <div id="image-container">
-                    <img id="main-img" alt="">
+                    <div id="rot-box">
+                        <img id="main-img" alt="">
+                    </div>
                 </div>
+                <div id="rotation-indicator"></div>
                 <div id="zoom-indicator"></div>
             </div>
         </div>
@@ -289,11 +310,14 @@
     // ── Zoom / pan ─────────────────────────────────────────────────────────
     const viewport  = document.getElementById('viewport');
     const container = document.getElementById('image-container');
+    const rotBox    = document.getElementById('rot-box');
     const img       = document.getElementById('main-img');
 
     let zoom = 1, panX = 0, panY = 0;
     let isPanReady = false, isPanning = false;
     let panStart = null;
+    let rotationDeg = 0;   // display rotation = (exif_orientation + rotation_correction) % 360
+    let displayW = 0, displayH = 0;  // visual dimensions of the image after rotation
 
     function applyTransform() {
         container.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
@@ -303,9 +327,28 @@
 
     function resetZoom() {
         zoom = 1;
-        panX = Math.max(0, (viewport.clientWidth  - img.clientWidth)  / 2);
-        panY = Math.max(0, (viewport.clientHeight - img.clientHeight) / 2);
+        panX = Math.max(0, (viewport.clientWidth  - displayW) / 2);
+        panY = Math.max(0, (viewport.clientHeight - displayH) / 2);
         applyTransform();
+    }
+
+    function applyRotationLayout() {
+        const natW = img.naturalWidth;
+        const natH = img.naturalHeight;
+        const vpW  = viewport.clientWidth  - 4;
+        const vpH  = viewport.clientHeight - 4;
+        const rot90 = rotationDeg === 90 || rotationDeg === 270;
+        const effW  = rot90 ? natH : natW;
+        const effH  = rot90 ? natW : natH;
+        const fit   = Math.min(1, vpW / effW, vpH / effH);
+        displayW = Math.round(effW * fit);
+        displayH = Math.round(effH * fit);
+        rotBox.style.width  = displayW + 'px';
+        rotBox.style.height = displayH + 'px';
+        img.style.width  = (rot90 ? displayH : displayW) + 'px';
+        img.style.height = (rot90 ? displayW : displayH) + 'px';
+        img.style.transform = `translate(-50%, -50%) rotate(${rotationDeg}deg)`;
+        resetZoom();
     }
 
     viewport.addEventListener('wheel', e => {
@@ -438,22 +481,21 @@
         }
     }
 
+    function updateRotationIndicator() {
+        const item = queue[currentIndex];
+        const corr = item ? (item.rotation_correction || 0) : 0;
+        document.getElementById('rotation-indicator').textContent = corr ? `↻ ${corr}°` : '';
+    }
+
     async function showImage(index) {
         currentIndex = index;
         const item = queue[index];
-        img.onload = function () {
-            const natW = img.naturalWidth;
-            const natH = img.naturalHeight;
-            const vpW  = viewport.clientWidth  - 4;
-            const vpH  = viewport.clientHeight - 4;
-            const fit  = Math.min(1, vpW / natW, vpH / natH);
-            img.style.width  = Math.round(natW * fit) + 'px';
-            img.style.height = Math.round(natH * fit) + 'px';
-            resetZoom();
-        };
+        rotationDeg = ((item.exif_orientation || 0) + (item.rotation_correction || 0)) % 360;
+        img.onload = function () { applyRotationLayout(); };
         img.src = `/serve/${item.image_id}`;
         renderRating(item.rating);
         renderVeto(item.veto_annotation_id !== null);
+        updateRotationIndicator();
         updateStatus();
         prefetchNext();
     }
@@ -587,6 +629,24 @@
 
     document.getElementById('btn-skip').addEventListener('click', skipImage);
 
+    // ── Rotation ───────────────────────────────────────────────────────────
+    async function setRotation(newCorrection) {
+        const item = queue[currentIndex];
+        item.rotation_correction = newCorrection;
+        rotationDeg = ((item.exif_orientation || 0) + newCorrection) % 360;
+        applyRotationLayout();
+        updateRotationIndicator();
+        try {
+            await fetch(`/api/rotation/${item.image_id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ degrees: newCorrection }),
+            });
+        } catch (err) {
+            console.error('Error saving rotation:', err);
+        }
+    }
+
     // ── Navigation ─────────────────────────────────────────────────────────
     function navigate(delta) {
         const next = currentIndex + delta;
@@ -610,6 +670,11 @@
         if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
         if (e.key === 'v' || e.key === 'V') { toggleVeto(); return; }
         if (e.key === 's' || e.key === 'S') { skipImage(); return; }
+        if (e.key === 'r' || e.key === 'R') {
+            const item = queue[currentIndex];
+            setRotation(((item.rotation_correction || 0) + 90) % 360);
+            return;
+        }
         if ((e.ctrlKey && e.key === 'z') || e.key === 'u' || e.key === 'U') { e.preventDefault(); undoSkip(); return; }
         if (e.key >= '0' && e.key <= '9') {
             applyRating(parseInt(e.key));

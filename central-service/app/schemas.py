@@ -54,6 +54,7 @@ class ImageCreate(BaseModel):
     camera_model: str | None = None
     image_width: int | None = None
     image_height: int | None = None
+    exif_orientation: int = 0
 
 class ImageOut(BaseModel):
     id: int
@@ -69,6 +70,7 @@ class ImageOut(BaseModel):
     camera_model: str | None
     image_width: int | None
     image_height: int | None
+    exif_orientation: int
     created_at: datetime.datetime
     model_config = {"from_attributes": True}
 
@@ -139,6 +141,14 @@ class AnnotationOut(BaseModel):
 class AnnotationUpdate(BaseModel):
     value: str | None = None
     source: str | None = None
+
+
+class RotationSet(BaseModel):
+    degrees: int  # 0 to clear, 90/180/270 to set
+
+
+class ExifOrientationPatch(BaseModel):
+    exif_orientation: int  # 0, 90, 180, or 270
 
 
 # --- Admin: Cameras ---

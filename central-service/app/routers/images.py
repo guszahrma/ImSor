@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user, require_role
 from ..database import get_db
 from ..models import Image, User
-from ..schemas import ImageCreate, ImageOut
+from ..schemas import ImageCreate, ImageOut, ExifOrientationPatch
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -34,6 +34,22 @@ def update_image(
         raise HTTPException(status_code=404, detail="Image not found")
     for key, value in image.model_dump().items():
         setattr(db_image, key, value)
+    db.commit()
+    db.refresh(db_image)
+    return db_image
+
+
+@router.patch("/{image_id}/exif-orientation", response_model=ImageOut)
+def patch_exif_orientation(
+    image_id: int,
+    body: ExifOrientationPatch,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
+):
+    db_image = db.query(Image).filter(Image.id == image_id).first()
+    if not db_image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    db_image.exif_orientation = body.exif_orientation
     db.commit()
     db.refresh(db_image)
     return db_image

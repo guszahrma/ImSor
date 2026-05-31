@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user, require_role
 from ..database import get_db
 from ..models import Annotation, Camera, Image, User
-from ..schemas import AnnotationCreate, AnnotationOut, AnnotationUpdate, ClusterVoteSubmit, ImageOut
+from ..schemas import AnnotationCreate, AnnotationOut, AnnotationUpdate, ClusterVoteSubmit, ImageOut, RotationSet
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -186,7 +186,7 @@ def rating_queue(
     }
     images = [img for img in images if img.id not in skipped_ids]
 
-    # Fetch this user's ratings and veto annotations
+    # Fetch this user's ratings, veto, and rotation annotations
     rated = {
         r.image_id: r for r in db.query(Annotation).filter(
             Annotation.user_id == user_id,
@@ -199,16 +199,24 @@ def rating_queue(
             Annotation.annotation_type == "veto",
         ).all()
     }
+    rotations = {
+        a.image_id: a for a in db.query(Annotation).filter(
+            Annotation.annotation_type == "rotation_correction",
+        ).all()
+    }
 
     result = []
     for image in images:
         ann = rated.get(image.id)
         veto = vetoed.get(image.id)
+        rot = rotations.get(image.id)
         result.append({
             "image_id": image.id,
             "rating": int(ann.value) if ann is not None else None,
             "annotation_id": ann.id if ann is not None else None,
             "veto_annotation_id": veto.id if veto is not None else None,
+            "exif_orientation": image.exif_orientation or 0,
+            "rotation_correction": int(rot.value) if rot is not None else 0,
         })
 
     # Unrated first, both groups randomized
@@ -297,6 +305,39 @@ def slideshow_queue(
     # Shuffle for variety
     random.shuffle(result)
     return result
+
+
+@router.put("/rotation/{image_id}")
+def set_rotation(
+    image_id: int,
+    body: RotationSet,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
+):
+    existing = db.query(Annotation).filter_by(
+        image_id=image_id,
+        annotation_type="rotation_correction",
+    ).first()
+    if body.degrees == 0:
+        if existing:
+            db.delete(existing)
+            db.commit()
+        return None
+    if existing:
+        existing.value = str(body.degrees)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    ann = Annotation(
+        image_id=image_id,
+        annotation_type="rotation_correction",
+        value=str(body.degrees),
+        source="manual",
+    )
+    db.add(ann)
+    db.commit()
+    db.refresh(ann)
+    return ann
 
 
 @router.delete("/{annotation_id}")

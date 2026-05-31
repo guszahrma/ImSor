@@ -178,6 +178,12 @@ def remove_community_granter(community_id: int, user_id: int) -> dict:
     return _request("DELETE", f"{config.server_url}/communities/{community_id}/granters/{user_id}").json()
 
 
+def set_rotation(image_id: int, degrees: int) -> dict | None:
+    """Upsert or clear the rotation_correction annotation for an image."""
+    return _request("PUT", f"{config.server_url}/annotations/rotation/{image_id}",
+                    json={"degrees": degrees}).json()
+
+
 def update_annotation(annotation_id: int, value: str) -> dict:
     return _request("PATCH", f"{config.server_url}/annotations/{annotation_id}",
                      json={"value": value}).json()

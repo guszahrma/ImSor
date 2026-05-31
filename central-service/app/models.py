@@ -43,6 +43,7 @@ class Image(Base):
     camera_model = Column(String(200))
     image_width = Column(Integer)
     image_height = Column(Integer)
+    exif_orientation = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

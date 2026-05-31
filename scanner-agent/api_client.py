@@ -65,6 +65,14 @@ class ApiClient:
         )
         return resp.json()
 
+    def patch_exif_orientation(self, image_id: int, exif_orientation: int) -> dict:
+        resp = self._request(
+            "PATCH",
+            f"{self.base_url}/images/{image_id}/exif-orientation",
+            json={"exif_orientation": exif_orientation},
+        )
+        return resp.json()
+
     def create_duplicate_pair(self, image_a_id: int, image_b_id: int) -> dict:
         resp = self._request(
             "POST",

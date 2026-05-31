@@ -407,6 +407,20 @@ def api_delete_annotation(annotation_id: int):
     return jsonify(result)
 
 
+@app.route("/api/rotation/<int:image_id>", methods=["PUT"])
+def api_set_rotation(image_id: int):
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json()
+    degrees = body.get("degrees", 0) if body else 0
+    try:
+        result = api_client.set_rotation(image_id, degrees)
+        return jsonify(result or {})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/annotations/<int:annotation_id>", methods=["PATCH"])
 def patch_annotation(annotation_id: int):
     """Update an annotation's value."""

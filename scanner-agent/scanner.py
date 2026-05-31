@@ -33,6 +33,9 @@ def _clean_str(value) -> str | None:
     return value.replace("\x00", "").strip() or None
 
 
+_EXIF_ORIENTATION_TO_DEGREES = {1: 0, 3: 180, 6: 90, 8: 270}
+
+
 def extract_exif(file_path: str) -> dict:
     result = {
         "date_taken": None,
@@ -42,6 +45,7 @@ def extract_exif(file_path: str) -> dict:
         "camera_model": None,
         "image_width": None,
         "image_height": None,
+        "exif_orientation": 0,
     }
     try:
         with Image.open(file_path) as img:
@@ -65,6 +69,11 @@ def extract_exif(file_path: str) -> dict:
             # Camera info
             result["camera_make"] = _clean_str(exif_data.get(ExifBase.Make))
             result["camera_model"] = _clean_str(exif_data.get(ExifBase.Model))
+
+            # Orientation
+            result["exif_orientation"] = _EXIF_ORIENTATION_TO_DEGREES.get(
+                exif_data.get(ExifBase.Orientation), 0
+            )
 
             # GPS
             gps_info = exif_data.get_ifd(0x8825)  # GPSInfo IFD
@@ -122,4 +131,5 @@ def build_image_data(file_path: str, scanner_host: str) -> dict:
         "camera_model": exif["camera_model"],
         "image_width": exif["image_width"],
         "image_height": exif["image_height"],
+        "exif_orientation": exif["exif_orientation"],
     }

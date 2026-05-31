@@ -1,5 +1,14 @@
 # ImSor — Domain Glossary
 
+## EXIF Orientation
+The rotation embedded in an image file's EXIF metadata, indicating how the image should be displayed relative to how it was captured. Read by the scanner at scan time and stored as degrees (0, 90, 180, 270) in the `Image` table. Zero means no rotation needed. Images missing this tag are treated as 0°.
+
+## Rotation Correction
+A user-supplied adjustment stored as an Annotation (`annotation_type = "rotation_correction"`, value in degrees: 0, 90, 180, 270). Represents additional clockwise rotation to apply on top of the EXIF Orientation when displaying the image. One correction per image — upserted on change, deleted when cycled back to 0°. Any logged-in user may set it from the Rate page using the `R` key, which cycles 0° → 90° → 180° → 270° → 0°.
+
+## Display Rotation
+The final clockwise rotation applied when presenting an image: `(EXIF Orientation + Rotation Correction) % 360`. Computed at display time, never stored.
+
 ## Duplicate Pair
 A persisted record that two specific images share the same checksum. Created by the scanner-agent when it finds two registered images with identical content. A Duplicate Pair is a detection artifact only — it carries no verdict and no resolved state.
 
