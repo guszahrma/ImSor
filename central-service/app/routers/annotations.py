@@ -204,12 +204,19 @@ def rating_queue(
             Annotation.annotation_type == "rotation_correction",
         ).all()
     }
+    bookmarks = {
+        a.image_id: a for a in db.query(Annotation).filter(
+            Annotation.user_id == user_id,
+            Annotation.annotation_type == "bookmark",
+        ).all()
+    }
 
     result = []
     for image in images:
         ann = rated.get(image.id)
         veto = vetoed.get(image.id)
         rot = rotations.get(image.id)
+        bm = bookmarks.get(image.id)
         result.append({
             "image_id": image.id,
             "rating": int(ann.value) if ann is not None else None,
@@ -217,6 +224,7 @@ def rating_queue(
             "veto_annotation_id": veto.id if veto is not None else None,
             "exif_orientation": image.exif_orientation or 0,
             "rotation_correction": int(rot.value) if rot is not None else 0,
+            "bookmark_annotation_id": bm.id if bm is not None else None,
         })
 
     # Unrated first, both groups randomized
