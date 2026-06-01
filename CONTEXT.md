@@ -72,6 +72,29 @@ An annotated User's opt-out from having images containing them shared beyond the
 ### Person
 A named individual who appears in images. Stored as a first-class record with a name, an optional birthdate, and an optional link to a User account. Person absorbs the former PersonUserLink table — the user link is now a nullable field on Person rather than a separate join table. A Person with a linked User account is an Annotated User. A Person may have a birthdate without having a User account, and vice versa.
 
+### Person Detection
+An AI-produced bounding box asserting that a person appears at a specific location in an image. Stored as an Annotation with `annotation_type = "person_bbox"`, `source = "ai:<model>"`, no `user_id`, and a JSON value carrying spatial coordinates (`x`, `y`, `width`, `height`) and a confidence score. A Person Detection carries no identity — it records only that *a* person is present, not *who* that person is. Person Detections are never mutated after creation.
+
+### Detection Adoption
+A user's version of a Person Detection, created when the user connects a bbox to a Person. Stored as an Annotation with `annotation_type = "person_bbox"`, `source = "manual"`, the adopting user's `user_id`, and a JSON value containing `inherited_from: <original_annotation_id>` plus optional adjusted coordinates. If the user adjusts the bbox geometry, the same row is updated in place (upserted). One Detection Adoption per user per Person Detection. Implicitly confirms the detection location and establishes ownership.
+
+### Person Identification
+A single annotator's assertion, at a point in time, that the person inside a specific Detection Adoption is a known Person (or is unidentifiable). Stored in a dedicated `person_identities` table referencing the Detection Adoption and a nullable Person record. A null `person_id` means the annotator examined the bbox and could not identify the person. The table is append-only — each new assertion is a new row. The latest row per annotator per Detection Adoption represents that annotator's current belief.
+
+### Detection Dismissal
+A user's assertion that a specific Person Detection is not relevant — they do not believe a person is present at that location. Stored in a dedicated `person_bbox_dismissals` table. Dismissal is per-user and does not affect other users' views. A Person Detection is permanently deleted only when it has been dismissed by at least 5 users and no Detection Adoption exists from any user.
+
+### Person Annotation Queue
+The ordered list of images presented to a logged-in annotator for person identification work. Images are assigned to one of five priority tiers based on global identification state and the current annotator's own contributions. The active tier is shown to the annotator. Priority order:
+
+1. All Person Detections on the image have no Detection Adoption from anyone.
+2. Some (but not all) Person Detections have a Detection Adoption from another user; none from the current user.
+3. All Person Detections have a Detection Adoption from another user; none from the current user.
+4. All Person Detections have a Detection Adoption from another user; the current user has adopted some but not all.
+5. The current user has adopted all Person Detections — revisit in random order.
+
+"Identified" means the annotator's latest Person Identification for a Detection Adoption has a non-null `person_id`. Display shows AI Person Detections by default, overridden by the user's own Detection Adoption where one exists.
+
 ### Annotated User
 A User who has been linked by a Superuser to a Person record. Annotated Users may Veto images they appear in. The mechanism by which Annotated Users revoke broader access is to be detailed.
 

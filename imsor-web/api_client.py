@@ -95,15 +95,34 @@ def delete_annotation(annotation_id: int) -> dict:
     return _request("DELETE", f"{config.server_url}/annotations/{annotation_id}").json()
 
 
-def get_bbox_queue() -> list[dict]:
-    """Return the bbox annotation queue: images with at least one unnamed person_bbox."""
+def get_bbox_queue(user_id: int) -> list[dict]:
+    """Return the bbox annotation queue ordered by the 5-tier annotation priority."""
     return _request("GET", f"{config.server_url}/annotations/bbox-queue",
-                    params={"active_model": config.active_bbox_model}).json()
+                    params={"user_id": user_id, "active_model": config.active_bbox_model}).json()
 
 
-def get_bbox_image(image_id: int) -> dict:
-    """Return image metadata + person_bbox annotations for a single image."""
-    return _request("GET", f"{config.server_url}/annotations/bbox-image/{image_id}").json()
+def get_bbox_image(image_id: int, user_id: int) -> dict:
+    """Return image metadata + user-aware person_bbox annotations for a single image."""
+    return _request("GET", f"{config.server_url}/annotations/bbox-image/{image_id}",
+                    params={"user_id": user_id, "active_model": config.active_bbox_model}).json()
+
+
+def get_known_people(user_id: int) -> list[str]:
+    """Return person names ordered by most recently used by this user."""
+    return _request("GET", f"{config.server_url}/annotations/known-people",
+                    params={"user_id": user_id}).json()
+
+
+def create_person_identity(bbox_annotation_id: int, person_id: int | None) -> dict:
+    """Append a Person Identification for the service user."""
+    return _request("POST", f"{config.server_url}/annotations/person-identities",
+                    json={"bbox_annotation_id": bbox_annotation_id, "person_id": person_id}).json()
+
+
+def dismiss_person_bbox(bbox_annotation_id: int) -> dict:
+    """Dismiss an AI person detection as irrelevant."""
+    return _request("POST", f"{config.server_url}/annotations/person-bbox-dismissals",
+                    json={"bbox_annotation_id": bbox_annotation_id}).json()
 
 
 def get_rating_queue(user_id: int) -> list[dict]:
@@ -188,8 +207,10 @@ def set_rotation(image_id: int, degrees: int) -> dict | None:
                     json={"degrees": degrees}).json()
 
 
-def update_annotation(annotation_id: int, value: str) -> dict:
-    return _request("PATCH", f"{config.server_url}/annotations/{annotation_id}",
-                     json={"value": value}).json()
+def update_annotation(annotation_id: int, value: str, user_id: int | None = None) -> dict:
+    body = {"value": value}
+    if user_id is not None:
+        body["user_id"] = user_id
+    return _request("PATCH", f"{config.server_url}/annotations/{annotation_id}", json=body).json()
 
 

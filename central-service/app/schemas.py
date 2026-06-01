@@ -141,6 +141,23 @@ class AnnotationOut(BaseModel):
 class AnnotationUpdate(BaseModel):
     value: str | None = None
     source: str | None = None
+    user_id: int | None = None
+
+
+class PersonIdentityCreate(BaseModel):
+    bbox_annotation_id: int
+    person_id: int | None = None
+
+class PersonIdentityOut(BaseModel):
+    id: int
+    bbox_annotation_id: int
+    person_id: int | None
+    user_id: int | None
+    created_at: datetime.datetime
+    model_config = {"from_attributes": True}
+
+class PersonBboxDismissalCreate(BaseModel):
+    bbox_annotation_id: int
 
 
 class RotationSet(BaseModel):

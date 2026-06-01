@@ -115,6 +115,36 @@ class Person(Base):
     )
 
 
+class PersonIdentity(Base):
+    __tablename__ = "person_identities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bbox_annotation_id = Column(Integer, ForeignKey("annotations.id", ondelete="CASCADE"), nullable=False)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    bbox_annotation = relationship("Annotation")
+    person = relationship("Person")
+    user = relationship("User")
+
+
+class PersonBboxDismissal(Base):
+    __tablename__ = "person_bbox_dismissals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    bbox_annotation_id = Column(Integer, ForeignKey("annotations.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    bbox_annotation = relationship("Annotation")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "bbox_annotation_id", name="uq_dismissal_user_bbox"),
+    )
+
+
 class Community(Base):
     __tablename__ = "communities"
 

@@ -488,8 +488,9 @@
     function updateStatus() {
         if (queue.length === 0) return;
         const item = queue[currentIndex];
+        const tierLabel = item.tier != null ? ` · Priority ${item.tier}` : '';
         document.getElementById('status').textContent =
-            `Image ${currentIndex + 1} of ${queue.length} · ${item.unnamed_count} unnamed`;
+            `Image ${currentIndex + 1} of ${queue.length} · ${item.unnamed_count} unnamed${tierLabel}`;
         document.getElementById('btn-prev').disabled = currentIndex === 0;
         document.getElementById('btn-next').disabled = currentIndex === queue.length - 1;
     }

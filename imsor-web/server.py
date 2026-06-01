@@ -357,48 +357,38 @@ def api_submit_cluster_vote():
 
 @app.route("/api/annotated-images/queue")
 def annotated_images_queue():
-    """Return the bbox annotation queue (images with at least one unnamed person_bbox)."""
+    """Return the bbox annotation queue ordered by the 5-tier annotation priority."""
     user = session.get("user")
     if not user:
         return jsonify({"error": "unauthorized"}), 401
     try:
-        return jsonify(api_client.get_bbox_queue())
+        return jsonify(api_client.get_bbox_queue(user_id=user["id"]))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/annotated-images/<int:image_id>")
 def annotated_image(image_id: int):
-    """Return image metadata + person_bbox annotations for a single image."""
+    """Return image metadata + user-aware person_bbox annotations for a single image."""
     user = session.get("user")
     if not user:
         return jsonify({"error": "unauthorized"}), 401
     try:
-        return jsonify(api_client.get_bbox_image(image_id))
+        return jsonify(api_client.get_bbox_image(image_id, user_id=user["id"]))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/known-people")
 def known_people():
-    """Return person names ordered by most recently used (newest first)."""
-    all_annotations = api_client.get_all_annotations()
-    # Track the latest created_at per name
-    latest: dict[str, str] = {}
-    for ann in all_annotations:
-        if ann["annotation_type"] == "person_bbox":
-            try:
-                val = json.loads(ann["value"])
-                name = val.get("person_name")
-                if name:
-                    ts = ann.get("created_at", "")
-                    if name not in latest or ts > latest[name]:
-                        latest[name] = ts
-            except (json.JSONDecodeError, TypeError):
-                pass
-    # Sort by timestamp descending (most recent first)
-    names = sorted(latest.keys(), key=lambda n: latest[n], reverse=True)
-    return jsonify(names)
+    """Return person names ordered by most recently used by the current user."""
+    user = session.get("user")
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        return jsonify(api_client.get_known_people(user_id=user["id"]))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/annotations", methods=["POST"])
@@ -448,11 +438,15 @@ def api_set_rotation(image_id: int):
 @app.route("/api/annotations/<int:annotation_id>", methods=["PATCH"])
 def patch_annotation(annotation_id: int):
     """Update an annotation's value."""
+    user = session.get("user")
     body = request.get_json()
     if not body or "value" not in body:
         abort(400)
     try:
-        result = api_client.update_annotation(annotation_id, body["value"])
+        result = api_client.update_annotation(
+            annotation_id, body["value"],
+            user_id=user["id"] if user else None,
+        )
     except Exception:
         abort(500)
     return jsonify(result)
