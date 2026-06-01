@@ -53,11 +53,10 @@ def main():
     print("Logged in.\n")
 
     print("Fetching annotations...")
-    all_anns = client.get_all_annotations()
-
-    rated_ids      = {a["image_id"] for a in all_anns if a["annotation_type"] == "slideshow_rating"}
-    skipped_ids    = {a["image_id"] for a in all_anns if a["annotation_type"] == "skip"}
-    annotated_ids  = {a["image_id"] for a in all_anns if a["annotation_type"] == "person_bbox" and a["source"].startswith("ai")}
+    rated_ids     = {a["image_id"] for a in client.get_annotations_by_type("slideshow_rating")}
+    skipped_ids   = {a["image_id"] for a in client.get_annotations_by_type("skip")}
+    annotated_ids = {a["image_id"] for a in client.get_annotations_by_type("person_bbox")
+                     if a["source"].startswith("ai")}
 
     candidate_ids = list(rated_ids - skipped_ids - annotated_ids)
     print(f"  Rated: {len(rated_ids)}  Skipped: {len(skipped_ids)}  Already annotated: {len(annotated_ids)}")

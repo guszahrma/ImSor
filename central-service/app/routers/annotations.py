@@ -31,12 +31,15 @@ def create_annotation(
 @router.get("/", response_model=list[AnnotationOut])
 def list_annotations(
     image_id: int | None = Query(None),
+    annotation_type: str | None = Query(None),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
     query = db.query(Annotation)
     if image_id is not None:
         query = query.filter(Annotation.image_id == image_id)
+    if annotation_type is not None:
+        query = query.filter(Annotation.annotation_type == annotation_type)
     return query.all()
 
 

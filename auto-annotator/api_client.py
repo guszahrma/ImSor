@@ -57,19 +57,10 @@ class ApiClient:
         resp = self._request("GET", f"{self.base_url}/images/{image_id}")
         return resp.json()
 
-    def get_all_annotations(self) -> list[dict]:
-        all_anns = []
-        skip = 0
-        limit = 1000
-        while True:
-            resp = self._request("GET", f"{self.base_url}/annotations/",
-                                 params={"skip": skip, "limit": limit})
-            batch = resp.json()
-            all_anns.extend(batch)
-            if len(batch) < limit:
-                break
-            skip += limit
-        return all_anns
+    def get_annotations_by_type(self, annotation_type: str) -> list[dict]:
+        resp = self._request("GET", f"{self.base_url}/annotations/",
+                             params={"annotation_type": annotation_type})
+        return resp.json()
 
     def get_annotations(self, image_id: int) -> list[dict]:
         resp = self._request(
