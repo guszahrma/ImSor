@@ -561,6 +561,8 @@ def slideshow_queue(
                     "avg_rating": round(avg, 1),
                     "rating_count": len(vals),
                     "date_taken": image.date_taken.isoformat() if image.date_taken else None,
+                    "latitude":   image.gps_latitude,
+                    "longitude":  image.gps_longitude,
                 })
 
     # Shuffle for variety

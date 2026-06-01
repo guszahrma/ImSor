@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>ImSor — Slideshow</title>
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl@2/dist/globe.gl.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; }
@@ -259,6 +260,23 @@
         </div>
 
         <div class="setting-row" style="margin-top: 1.4em;">
+            <label>
+                <input type="checkbox" id="location-enabled">
+                Show location
+            </label>
+            <div id="location-controls" style="margin-top:6px; display:flex; flex-direction:column; gap:6px; opacity:0.35; pointer-events:none; transition:opacity 0.2s;">
+                <label style="font-size:0.82rem; color:#aaa;">
+                    Globe zoom: <span id="globe-zoom-display">1×</span>
+                    <input type="range" id="globe-zoom" min="0" max="100" step="1" value="0" style="width:100%; margin-top:3px;">
+                </label>
+                <label style="font-size:0.82rem; color:#aaa; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="location-only">
+                    Only images with location
+                </label>
+            </div>
+        </div>
+
+        <div class="setting-row" style="margin-top: 1.4em;">
             <label for="timer-interval">Speed: <span id="timer-display">5s</span></label>
             <input type="range" id="timer-interval" min="1" max="30" value="5">
         </div>
@@ -293,6 +311,9 @@
         <div id="image-area">
             <img id="main-img" alt="">
             <div id="progress"></div>
+            <div id="globe-overlay" style="display:none; position:absolute; bottom:16px; left:16px; z-index:20; pointer-events:none; border-radius:50%; overflow:hidden; box-shadow:0 2px 16px rgba(0,0,0,0.7); width:180px; height:180px;">
+                <div id="globe-container" style="width:180px; height:180px;"></div>
+            </div>
         </div>
     </div>
 
@@ -345,6 +366,17 @@
         document.getElementById('zoom-margin-display').textContent = saved.zoomMargin;
     }
     if (saved.zoomSelmaOnly) document.getElementById('zoom-selma-only').checked = true;
+    if (saved.locationEnabled) {
+        document.getElementById('location-enabled').checked = true;
+        document.getElementById('location-controls').style.opacity      = '1';
+        document.getElementById('location-controls').style.pointerEvents = '';
+    }
+    if (saved.locationOnly) document.getElementById('location-only').checked = true;
+    if (saved.globeZoom !== undefined) {
+        const gz = parseFloat(saved.globeZoom);
+        document.getElementById('globe-zoom').value = (gz >= 0 && gz <= 100) ? gz : 0;
+        document.getElementById('globe-zoom-display').textContent = globeZoomLabel();
+    }
 
     function saveSettings() {
         localStorage.setItem('slideshow-settings', JSON.stringify({
@@ -356,6 +388,9 @@
             zoomEnabled:      document.getElementById('zoom-enabled').checked,
             zoomMargin:       document.getElementById('zoom-margin').value,
             zoomSelmaOnly:    document.getElementById('zoom-selma-only').checked,
+            locationEnabled:  document.getElementById('location-enabled').checked,
+            locationOnly:     document.getElementById('location-only').checked,
+            globeZoom:        document.getElementById('globe-zoom').value,
         }));
     }
 
@@ -465,6 +500,13 @@
         const selmaOnly   = document.getElementById('zoom-selma-only').checked;
         if (zoomEnabled && selmaOnly) {
             filtered = filtered.filter(item => item.selma_bbox != null);
+        }
+
+        // Location-only filter
+        const locationEnabled = document.getElementById('location-enabled').checked;
+        const locationOnly    = document.getElementById('location-only').checked;
+        if (locationEnabled && locationOnly) {
+            filtered = filtered.filter(item => item.latitude != null && item.longitude != null);
         }
 
         queue = filtered;
@@ -596,6 +638,13 @@
         updateStatus();
         prefetchNext();
         updateAgeDisplay(item.date_taken);
+        if (document.getElementById('location-enabled').checked) {
+            if (item.latitude != null && item.longitude != null) {
+                showGlobeAt(item.longitude, item.latitude);
+            } else {
+                document.getElementById('globe-overlay').style.display = 'none';
+            }
+        }
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -660,8 +709,80 @@
         } catch (_) {}
     }
 
+    // ── Location controls ──────────────────────────────────────────────────
+    document.getElementById('location-enabled').addEventListener('change', function () {
+        const on = this.checked;
+        document.getElementById('location-controls').style.opacity      = on ? '1' : '0.35';
+        document.getElementById('location-controls').style.pointerEvents = on ? '' : 'none';
+        if (on) initGlobe();
+        else document.getElementById('globe-overlay').style.display = 'none';
+        applyFilters(); saveSettings();
+    });
+    document.getElementById('location-only').addEventListener('change', function () {
+        applyFilters(); saveSettings();
+    });
+    document.getElementById('globe-zoom').addEventListener('input', function () {
+        document.getElementById('globe-zoom-display').textContent = globeZoomLabel();
+        if (globeReady) globeInstance.pointOfView({ lat: currentLat, lng: currentLon, altitude: globeAltitude() });
+        saveSettings();
+    });
+
+    function globeAltitude() {
+        // slider 0 → altitude 2.0 (full earth), slider 100 → altitude 0.02 (close up)
+        const t = parseFloat(document.getElementById('globe-zoom').value) / 100;
+        return 2.0 * Math.pow(0.01, t);
+    }
+
+    function globeZoomLabel() {
+        const t = parseFloat(document.getElementById('globe-zoom').value) / 100;
+        const factor = Math.pow(100, t);
+        return (factor < 10 ? factor.toFixed(1) : Math.round(factor)) + '×';
+    }
+
+    // ── Globe ──────────────────────────────────────────────────────────────
+    let globeInstance = null;
+    let globeReady = false;
+    let currentLat = 0, currentLon = 0;
+
+    function initGlobe() {
+        if (globeReady) return;
+        globeInstance = Globe()
+            .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+            .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+            .backgroundColor('rgba(0,0,0,0)')
+            .width(180).height(180)
+            .htmlElementsData([])
+            .htmlElement(() => {
+                const el = document.createElement('div');
+                el.style.cssText = 'width:7px;height:7px;border-radius:50%;background:rgba(255,60,60,0.9);border:1px solid white;transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,0.6);';
+                return el;
+            })
+            .showAtmosphere(true)
+            .atmosphereColor('#4488cc')
+            .atmosphereAltitude(0.12);
+
+        globeInstance(document.getElementById('globe-container'));
+
+        const controls = globeInstance.controls();
+        controls.enableZoom   = false;
+        controls.enablePan    = false;
+        controls.enableRotate = false;
+        controls.autoRotate   = false;
+
+        globeReady = true;
+    }
+
+    function showGlobeAt(lon, lat) {
+        if (!globeReady) initGlobe();
+        document.getElementById('globe-overlay').style.display = '';
+        currentLat = lat; currentLon = lon;
+        globeInstance.htmlElementsData([{ lat, lng: lon }]);
+        globeInstance.pointOfView({ lat, lng: lon, altitude: globeAltitude() }, 1000);
+    }
+
     // ── Boot ───────────────────────────────────────────────────────────────
     loadSelmasBirthdate();
+    if (document.getElementById('location-enabled').checked) initGlobe();
     loadData();
     </script>
 </body>
