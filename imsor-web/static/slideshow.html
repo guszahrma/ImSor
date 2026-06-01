@@ -105,6 +105,40 @@
         }
         .setting-row input[type="range"] { width: 100%; }
         #timer-display { font-size: 0.85rem; color: #aaa; }
+
+        /* ── Age range slider ────────────────────────────────────────────── */
+        #age-filter-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        #age-filter-row input[type="checkbox"] { accent-color: #6a6aaa; width: 14px; height: 14px; }
+        #age-slider-wrap {
+            margin-top: 6px; position: relative; height: 20px;
+            transition: opacity 0.2s;
+        }
+        #age-slider-wrap.disabled { opacity: 0.35; pointer-events: none; }
+        .age-track {
+            position: absolute; top: 8px; left: 0; right: 0;
+            height: 4px; border-radius: 2px; background: #333;
+        }
+        #age-range-fill {
+            position: absolute; height: 100%; background: #6a6aaa; border-radius: 2px;
+        }
+        #age-slider-wrap input[type="range"] {
+            position: absolute; width: 100%; top: 0;
+            -webkit-appearance: none; appearance: none;
+            background: transparent; pointer-events: none;
+            margin: 0; padding: 0; height: 20px;
+        }
+        #age-slider-wrap input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            pointer-events: all; width: 14px; height: 14px;
+            border-radius: 50%; background: #8888cc;
+            border: 2px solid #aaaaee; cursor: pointer;
+        }
+        #age-slider-wrap input[type="range"]::-moz-range-thumb {
+            pointer-events: all; width: 14px; height: 14px;
+            border-radius: 50%; background: #8888cc;
+            border: 2px solid #aaaaee; cursor: pointer; box-sizing: border-box;
+        }
+
         #btn-apply-filter {
             width: 100%; padding: 7px; font-size: 0.9rem;
             border: none; border-radius: 4px; cursor: pointer;
@@ -191,6 +225,18 @@
         </div>
         <button id="btn-apply-filter">Apply &amp; reload</button>
 
+        <div class="setting-row" id="age-filter-row" style="margin-top: 1.4em;">
+            <label>
+                <input type="checkbox" id="age-filter-enabled">
+                Selma's age: <span id="age-range-display">0 – 18</span>
+            </label>
+            <div id="age-slider-wrap" class="disabled">
+                <div class="age-track"><div id="age-range-fill"></div></div>
+                <input type="range" id="age-min" min="0" max="18" step="0.5" value="0">
+                <input type="range" id="age-max" min="0" max="18" step="0.5" value="18">
+            </div>
+        </div>
+
         <div class="setting-row" style="margin-top: 1.4em;">
             <label for="timer-interval">Speed: <span id="timer-display">5s</span></label>
             <input type="range" id="timer-interval" min="1" max="30" value="5">
@@ -239,7 +285,8 @@
     }).catch(() => {});
 
     // ── State ──────────────────────────────────────────────────────────────
-    let queue = [];
+    let fullQueue = [];   // all images from server (unfiltered)
+    let queue = [];       // current filtered view — all existing code uses this
     let currentIndex = 0;
     let isPlaying = false;
     let timerHandle = null;
@@ -260,11 +307,21 @@
         document.getElementById('timer-interval').value = saved.timerInterval;
         document.getElementById('timer-display').textContent = saved.timerInterval + 's';
     }
+    if (saved.ageFilterEnabled) {
+        document.getElementById('age-filter-enabled').checked = true;
+        document.getElementById('age-slider-wrap').classList.remove('disabled');
+    }
+    if (saved.ageMin !== undefined) document.getElementById('age-min').value = saved.ageMin;
+    if (saved.ageMax !== undefined) document.getElementById('age-max').value = saved.ageMax;
+    updateAgeSliderDisplay();
 
     function saveSettings() {
         localStorage.setItem('slideshow-settings', JSON.stringify({
-            minRating: document.getElementById('min-rating').value,
-            timerInterval: document.getElementById('timer-interval').value,
+            minRating:        document.getElementById('min-rating').value,
+            timerInterval:    document.getElementById('timer-interval').value,
+            ageFilterEnabled: document.getElementById('age-filter-enabled').checked,
+            ageMin:           document.getElementById('age-min').value,
+            ageMax:           document.getElementById('age-max').value,
         }));
     }
 
@@ -323,26 +380,84 @@
         try {
             const resp = await fetch(`/api/slideshow-queue?min_rating=${minRating}`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            queue = await resp.json();
+            fullQueue = await resp.json();
         } catch (err) {
             document.getElementById('loading-area').style.display = 'flex';
             document.getElementById('loading').textContent = 'Error loading: ' + err.message;
             return;
         }
+        currentIndex = 0;
+        applyAgeFilter(true);
+    }
 
-        document.getElementById('loading-area').style.display = 'none';
+    function computeAgeDecimal(birthdate, dateTaken) {
+        if (!birthdate || !dateTaken) return null;
+        const birth = new Date(birthdate);
+        const taken = new Date(dateTaken);
+        if (taken < birth) return null;
+        return (taken - birth) / (365.25 * 24 * 60 * 60 * 1000);
+    }
+
+    function updateAgeSliderDisplay() {
+        const min = parseFloat(document.getElementById('age-min').value);
+        const max = parseFloat(document.getElementById('age-max').value);
+        const sliderMax = 18;
+        const leftPct  = (min / sliderMax) * 100;
+        const rightPct = (max / sliderMax) * 100;
+        document.getElementById('age-range-fill').style.left  = leftPct + '%';
+        document.getElementById('age-range-fill').style.width = (rightPct - leftPct) + '%';
+        document.getElementById('age-range-display').textContent =
+            min === max ? `${min}` : `${min} – ${max}`;
+    }
+
+    function applyAgeFilter(autoplay = false) {
+        const enabled = document.getElementById('age-filter-enabled').checked;
+        if (!enabled || !selmaBirthdate) {
+            queue = fullQueue;
+        } else {
+            const minAge = parseFloat(document.getElementById('age-min').value);
+            const maxAge = parseFloat(document.getElementById('age-max').value);
+            queue = fullQueue.filter(item => {
+                const age = computeAgeDecimal(selmaBirthdate, item.date_taken);
+                return age !== null && age >= minAge && age <= maxAge;
+            });
+        }
 
         if (queue.length === 0) {
+            document.getElementById('main-layout').style.display = 'none';
             document.getElementById('loading-area').style.display = 'flex';
             document.getElementById('loading').textContent = 'No images match your criteria.';
             return;
         }
 
+        document.getElementById('loading-area').style.display = 'none';
         document.getElementById('main-layout').style.display = 'flex';
-        currentIndex = 0;
-        await showImage(0);
-        startAutoplay();
+        if (currentIndex >= queue.length) currentIndex = 0;
+        showImage(currentIndex);
+        if (autoplay) startAutoplay();
     }
+
+    document.getElementById('age-filter-enabled').addEventListener('change', function () {
+        document.getElementById('age-slider-wrap').classList.toggle('disabled', !this.checked);
+        applyAgeFilter();
+        saveSettings();
+    });
+
+    document.getElementById('age-min').addEventListener('input', function () {
+        const max = parseFloat(document.getElementById('age-max').value);
+        if (parseFloat(this.value) > max) this.value = max;
+        updateAgeSliderDisplay();
+        if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+        saveSettings();
+    });
+
+    document.getElementById('age-max').addEventListener('input', function () {
+        const min = parseFloat(document.getElementById('age-min').value);
+        if (parseFloat(this.value) < min) this.value = min;
+        updateAgeSliderDisplay();
+        if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+        saveSettings();
+    });
 
     document.getElementById('btn-apply-filter').addEventListener('click', loadData);
 
@@ -433,7 +548,11 @@
             if (!resp.ok) return;
             const persons = await resp.json();
             const selma = persons.find(p => p.name === 'Selma Zahr');
-            if (selma) selmaBirthdate = selma.birthdate;
+            if (selma) {
+                selmaBirthdate = selma.birthdate;
+                // Re-apply filter now that birthdate is known (in case filter was enabled on load)
+                if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+            }
         } catch (_) {}
     }
 
