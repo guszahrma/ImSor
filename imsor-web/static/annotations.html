@@ -296,6 +296,7 @@
             <h3>Bounding boxes</h3>
             <table><tbody>
                 <tr><td>Click box</td><td>Select it</td></tr>
+                <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Next / previous box (spatial order)</td></tr>
                 <tr><td>Drag empty space</td><td>Draw a new box</td></tr>
                 <tr><td>Drag selected box</td><td>Move it</td></tr>
                 <tr><td>Drag corner handle</td><td>Resize it</td></tr>
@@ -367,6 +368,7 @@
     let knownPeople = [];
     let selectedAnn = null;
     let currentAnnotations = [];
+    let spatialAnnotations = [];
     let currentImage = null;
     const imageCache = new Map();
 
@@ -507,6 +509,7 @@
 
         currentImage = data.image;
         currentAnnotations = data.annotations;
+        rebuildSpatialOrder();
         document.getElementById('filepath').textContent = currentImage.file_path;
 
         img.onload = function () {
@@ -569,6 +572,15 @@
         }
     }
 
+    function rebuildSpatialOrder() {
+        spatialAnnotations = [...currentAnnotations].sort((a, b) => {
+            const va = JSON.parse(a.value), vb = JSON.parse(b.value);
+            const ay = va.y + va.height / 2, by_ = vb.y + vb.height / 2;
+            const ax = va.x + va.width  / 2, bx  = vb.x + vb.width  / 2;
+            return ay !== by_ ? ay - by_ : ax - bx;
+        });
+    }
+
     function autoSelectFirstUnnamed() {
         const first = currentAnnotations.find(a => !JSON.parse(a.value).person_name)
             || currentAnnotations[0];
@@ -609,6 +621,7 @@
         for (let i = 0; i < knownPeople.length; i++) {
             const name = knownPeople[i];
             const btn = document.createElement('button');
+            btn.tabIndex = -1;
             if (i < 10) {
                 const s = document.createElement('span');
                 s.className = 'shortcut';
@@ -807,6 +820,7 @@
             alert('Error creating box: ' + err.message); return;
         }
         currentAnnotations.push(ann);
+        rebuildSpatialOrder();
         imageCache.delete(currentImage.id);
         queue[currentIndex].unnamed_count++;
         updateStatus();
@@ -829,6 +843,7 @@
         }
         selectedAnn = null;
         currentAnnotations = currentAnnotations.filter(a => a.id !== ann.id);
+        rebuildSpatialOrder();
         imageCache.delete(currentImage.id);
         const item = queue[currentIndex];
         if (wasUnnamed) item.unnamed_count--;
@@ -905,12 +920,42 @@
         showImage(newIndex);
     }
 
+    function panToBox(ann) {
+        const val = JSON.parse(ann.value);
+        const left   = val.x                   * scaleX * zoom + panX;
+        const top    = val.y                   * scaleY * zoom + panY;
+        const right  = (val.x + val.width)     * scaleX * zoom + panX;
+        const bottom = (val.y + val.height)    * scaleY * zoom + panY;
+        if (left >= 0 && top >= 0 && right <= viewport.clientWidth && bottom <= viewport.clientHeight) return;
+        const cx = (val.x + val.width  / 2) * scaleX;
+        const cy = (val.y + val.height / 2) * scaleY;
+        panX = viewport.clientWidth  / 2 - cx * zoom;
+        panY = viewport.clientHeight / 2 - cy * zoom;
+        applyTransform();
+    }
+
     function selectNextBox() {
-        if (!selectedAnn || currentAnnotations.length < 2) return;
-        const curIdx = currentAnnotations.findIndex(a => a.id === selectedAnn.id);
-        const nextAnn = currentAnnotations[(curIdx + 1) % currentAnnotations.length];
+        if (!spatialAnnotations.length) return;
+        let nextIdx = 0;
+        if (selectedAnn) {
+            const curIdx = spatialAnnotations.findIndex(a => a.id === selectedAnn.id);
+            nextIdx = (curIdx + 1) % spatialAnnotations.length;
+        }
+        const nextAnn = spatialAnnotations[nextIdx];
         const el = container.querySelector(`.bbox[data-ann-id="${nextAnn.id}"]`);
-        if (el) selectBox(nextAnn, el);
+        if (el) { selectBox(nextAnn, el); panToBox(nextAnn); }
+    }
+
+    function selectPrevBox() {
+        if (!spatialAnnotations.length) return;
+        let prevIdx = spatialAnnotations.length - 1;
+        if (selectedAnn) {
+            const curIdx = spatialAnnotations.findIndex(a => a.id === selectedAnn.id);
+            prevIdx = (curIdx - 1 + spatialAnnotations.length) % spatialAnnotations.length;
+        }
+        const prevAnn = spatialAnnotations[prevIdx];
+        const el = container.querySelector(`.bbox[data-ann-id="${prevAnn.id}"]`);
+        if (el) { selectBox(prevAnn, el); panToBox(prevAnn); }
     }
 
     // ── Bbox visibility ────────────────────────────────────────────────────
@@ -1002,6 +1047,11 @@
         }
         if (e.target.tagName === 'INPUT') return;
 
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            if (e.shiftKey) selectPrevBox(); else selectNextBox();
+            return;
+        }
         if (e.key === 'ArrowLeft')  { navigate(-1); return; }
         if (e.key === 'ArrowRight') { navigate(1);  return; }
         if (e.key === 'Escape') {
