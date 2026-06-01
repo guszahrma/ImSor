@@ -87,6 +87,9 @@ Martin marking an image with any slideshow_rating value, signalling that the ima
 ### Skip
 A personal annotation (`annotation_type = "skip"`) recording that a user has consciously passed over an image and does not want it to reappear in their rating queue. A Skip carries no quality verdict and does not affect other users' queues or the slideshow. Introduced in the deadend/selmas_student_party branch; all Skip annotations should be deleted when reverting to main.
 
+### Unwelcomed
+The default role assigned to any User who registers via Google OAuth. An Unwelcomed user can see only a holding page with a logout button — no ImSor content is accessible. A Superuser must manually promote the user to a higher role before they gain access. The holding page informs the user that the system owner has been notified and will assess their access.
+
 ### Bookmark
 A personal annotation recording that a user wants to return to an image for a purpose not yet defined. One Bookmark per user per image — toggled on and off. A Bookmark has no value payload and no effect on any queue, rating, or sharing logic. Set from the Rate page with the `B` key.
 

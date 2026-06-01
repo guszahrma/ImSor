@@ -91,7 +91,7 @@ def google_logged_in(blueprint, token):
                 api_client.create_user_via_oauth(
                     username=email,
                     display_name=user_info.get("name"),
-                    role="basic-user",
+                    role="unwelcomed",
                 )
                 user_record = api_client.get_user_by_username(email)
             except Exception:
@@ -112,6 +112,20 @@ def logout():
     session.pop("user", None)
     session.pop("google_oauth_token", None)
     return redirect(url_for("index"))
+
+
+@app.before_request
+def block_unwelcomed():
+    user = session.get("user")
+    if user and user.get("role") == "unwelcomed":
+        allowed = ("/pending", "/logout", "/login")
+        if not any(request.path.startswith(p) for p in allowed):
+            return redirect(url_for("pending"))
+
+
+@app.route("/pending")
+def pending():
+    return send_file(Path(__file__).parent / "static" / "pending.html")
 
 
 @app.route("/")
@@ -480,7 +494,7 @@ def api_update_user_role(user_id):
         return jsonify({"error": "forbidden"}), 403
     data = request.get_json()
     role = data.get("role")
-    if role not in ("superuser", "maintainer", "basic-user"):
+    if role not in ("superuser", "maintainer", "basic-user", "unwelcomed"):
         return jsonify({"error": "invalid role"}), 400
     try:
         updated = api_client.update_user_role(user_id, role)

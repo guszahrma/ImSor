@@ -62,7 +62,7 @@
             users.forEach(u => {
                 const tr = document.createElement('tr');
                 const isSelf = u.id === user.id;
-                const roleOptions = ['superuser', 'maintainer', 'basic-user'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r.replace('basic-user','basic-user')}</option>`).join('');
+                const roleOptions = ['superuser', 'maintainer', 'basic-user', 'unwelcomed'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('');
                 tr.innerHTML = `
                     <td>${u.id}</td>
                     <td>${u.username}</td>

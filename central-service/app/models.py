@@ -14,7 +14,7 @@ class User(Base):
     username = Column(String(100), unique=True, nullable=False, index=True)
     display_name = Column(String(200))
     password_hash = Column(String(200), nullable=False)
-    role = Column(String(20), nullable=False, default="basic-user")  # "superuser", "maintainer", "basic-user"
+    role = Column(String(20), nullable=False, default="unwelcomed")  # "superuser", "maintainer", "basic-user", "unwelcomed"
     can_create_community = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
