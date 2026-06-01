@@ -139,6 +139,10 @@ def get_slideshow_queue(user_id: int, min_rating: float = 7.0) -> list[dict]:
 def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()
 
+def get_rating_histogram(user_ids: str) -> list[dict]:
+    return _request("GET", f"{config.server_url}/users/rating-histogram",
+                    params={"user_ids": user_ids}).json()
+
 
 # --- Admin ---
 

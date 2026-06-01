@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth import hash_password, require_role, get_current_user
 from ..database import get_db
-from ..models import User
+from ..models import User, Annotation
 from ..schemas import UserCreate, UserOut
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -53,6 +54,44 @@ def list_users(
 @router.get("/me", response_model=UserOut)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/rating-histogram")
+def get_rating_histogram(
+    user_ids: str = Query(...),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    id_list = [int(x) for x in user_ids.split(",") if x.strip().isdigit()]
+    if not id_list:
+        return []
+    users_map = {u.id: u for u in db.query(User).filter(User.id.in_(id_list)).all()}
+    rows = (
+        db.query(Annotation.user_id, Annotation.value, func.count(Annotation.id).label("cnt"))
+        .filter(
+            Annotation.annotation_type == "slideshow_rating",
+            Annotation.user_id.in_(id_list),
+        )
+        .group_by(Annotation.user_id, Annotation.value)
+        .all()
+    )
+    histograms = {uid: [0] * 10 for uid in id_list}
+    for row in rows:
+        try:
+            bucket = int(row.value)
+            if 0 <= bucket <= 9:
+                histograms[row.user_id][bucket] = row.cnt
+        except (ValueError, TypeError):
+            pass
+    return [
+        {
+            "user_id": uid,
+            "display_name": (users_map[uid].display_name or users_map[uid].username) if uid in users_map else str(uid),
+            "histogram": histograms[uid],
+        }
+        for uid in id_list
+        if uid in users_map
+    ]
 
 
 @router.get("/{user_id}", response_model=UserOut)

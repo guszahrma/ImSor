@@ -10,6 +10,27 @@
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background: #f0f0f0; }
         .hidden { display: none; }
+
+        #show-histograms-btn { margin-top: 1em; padding: 6px 14px; cursor: pointer; }
+
+        #histogram-panel { margin-top: 2em; }
+        .histogram-container { display: flex; gap: 2em; flex-wrap: wrap; }
+        .histogram-card { border: 1px solid #ccc; padding: 1em; border-radius: 4px; min-width: 220px; }
+        .histogram-title { font-weight: bold; margin-bottom: 0.75em; font-size: 0.9em; }
+        .histogram-bars { display: flex; align-items: flex-end; height: 80px; gap: 3px; }
+        .histogram-bar-wrap { display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .histogram-bar { width: 100%; min-height: 2px; }
+        .histogram-count { font-size: 0.6em; color: #666; margin-top: 2px; }
+        .histogram-label { font-size: 0.7em; color: #888; }
+        .bar-0, .bar-1, .bar-2 { background: #6b1f1f; }
+        .bar-3, .bar-4, .bar-5 { background: #5a4010; }
+        .bar-6, .bar-7, .bar-8 { background: #0e4040; }
+        .bar-9 { background: #1a5a1a; }
+
+        .person-input { border: 1px solid transparent; background: transparent; width: 130px; font-size: 0.9em; padding: 2px 4px; }
+        .person-input:focus { outline: none; border-color: #aaa; background: #fff; border-radius: 3px; }
+        .person-unlink { cursor: pointer; color: #bbb; font-size: 0.85em; border: none; background: none; padding: 0 2px; line-height: 1; }
+        .person-unlink:hover { color: #c00; }
     </style>
 </head>
 <body>
@@ -28,17 +49,29 @@
         <table id="user-table">
             <thead>
                 <tr>
+                    <th><input type="checkbox" id="select-all" title="Select all"></th>
                     <th>ID</th>
                     <th>Username</th>
                     <th>Display Name</th>
                     <th>Role</th>
+                    <th>Linked Person</th>
                     <th>Created At</th>
                 </tr>
             </thead>
             <tbody></tbody>
         </table>
+        <datalist id="persons-datalist"></datalist>
+        <button id="show-histograms-btn" class="hidden">Show histograms</button>
+        <div id="histogram-panel" class="hidden">
+            <h2 style="font-size:1.1em;margin:1.5em 0 0.5em;">Rating Histograms</h2>
+            <div class="histogram-container" id="histogram-container"></div>
+        </div>
     </div>
     <script>
+    let allPersons = [];
+    let personByUserId = {};
+    let selectedUserIds = new Set();
+
     async function getCurrentUser() {
         const resp = await fetch('/api/current_user');
         if (!resp.ok) return null;
@@ -49,57 +82,206 @@
         if (!resp.ok) throw new Error('Failed to fetch users');
         return await resp.json();
     }
-    (async function() {
+    async function getPersons() {
+        const resp = await fetch('/api/admin/persons');
+        if (!resp.ok) return [];
+        return await resp.json();
+    }
+    async function getPersonLinks() {
+        const resp = await fetch('/api/admin/person-links');
+        if (!resp.ok) return [];
+        return await resp.json();
+    }
+    async function getRatingHistogram(userIds) {
+        const resp = await fetch(`/api/users/rating-histogram?user_ids=${userIds.join(',')}`);
+        if (!resp.ok) throw new Error('Failed to fetch histograms');
+        return await resp.json();
+    }
+
+    function updateHistogramsBtn() {
+        const btn = document.getElementById('show-histograms-btn');
+        if (selectedUserIds.size > 0) {
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+            document.getElementById('histogram-panel').classList.add('hidden');
+        }
+    }
+
+    function renderHistograms(data) {
+        const container = document.getElementById('histogram-container');
+        container.innerHTML = '';
+        if (!data.length) {
+            container.innerHTML = '<em>No rating data for selected users.</em>';
+            return;
+        }
+        data.forEach(({ display_name, histogram }) => {
+            const max = Math.max(...histogram, 1);
+            const bars = histogram.map((count, i) => {
+                const h = Math.round((count / max) * 60);
+                return `<div class="histogram-bar-wrap">
+                    <div class="histogram-bar bar-${i}" style="height:${h}px" title="${count} ratings of ${i}"></div>
+                    <div class="histogram-count">${count || ''}</div>
+                    <div class="histogram-label">${i}</div>
+                </div>`;
+            }).join('');
+            const card = document.createElement('div');
+            card.className = 'histogram-card';
+            card.innerHTML = `<div class="histogram-title">${display_name}</div>
+                <div class="histogram-bars">${bars}</div>`;
+            container.appendChild(card);
+        });
+    }
+
+    async function showHistograms() {
+        const ids = [...selectedUserIds];
+        const container = document.getElementById('histogram-container');
+        container.innerHTML = '<em>Loading…</em>';
+        document.getElementById('histogram-panel').classList.remove('hidden');
+        try {
+            renderHistograms(await getRatingHistogram(ids));
+        } catch (e) {
+            container.innerHTML = `<em>Error: ${e.message}</em>`;
+        }
+    }
+
+    function buildPersonCell(userId) {
+        const person = personByUserId[userId];
+        const td = document.createElement('td');
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'person-input';
+        input.setAttribute('list', 'persons-datalist');
+        input.value = person ? person.name : '';
+        input.placeholder = '—';
+
+        const unlinkBtn = document.createElement('button');
+        unlinkBtn.className = 'person-unlink';
+        unlinkBtn.textContent = '×';
+        unlinkBtn.title = 'Unlink person';
+        unlinkBtn.style.display = person ? '' : 'none';
+
+        input.addEventListener('change', async function () {
+            const name = this.value.trim();
+            if (!name) return;
+            if (!allPersons.find(p => p.name === name)) {
+                this.style.background = '#ffcdd2';
+                setTimeout(() => { this.style.background = ''; }, 1200);
+                return;
+            }
+            try {
+                const result = await fetch('/api/admin/person-links', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ person_name: name, user_id: userId }),
+                }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
+                personByUserId[userId] = result;
+                unlinkBtn.style.display = '';
+                this.style.background = '#c8e6c9';
+                setTimeout(() => { this.style.background = ''; }, 1200);
+            } catch {
+                alert('Failed to link person.');
+            }
+        });
+
+        unlinkBtn.addEventListener('click', async function () {
+            const linked = personByUserId[userId];
+            if (!linked) return;
+            try {
+                await fetch(`/api/admin/person-links/${linked.id}`, { method: 'DELETE' })
+                    .then(r => { if (!r.ok) throw new Error(); });
+                delete personByUserId[userId];
+                input.value = '';
+                this.style.display = 'none';
+            } catch {
+                alert('Failed to unlink person.');
+            }
+        });
+
+        td.appendChild(input);
+        td.appendChild(unlinkBtn);
+        return td;
+    }
+
+    (async function () {
         const user = await getCurrentUser();
         if (!user || user.role !== 'superuser') {
             document.getElementById('not-authorized').classList.remove('hidden');
             return;
         }
         document.getElementById('user-table-container').classList.remove('hidden');
-        try {
-            const users = await getAllUsers();
-            const tbody = document.querySelector('#user-table tbody');
-            users.forEach(u => {
-                const tr = document.createElement('tr');
-                const isSelf = u.id === user.id;
-                const roleOptions = ['superuser', 'maintainer', 'basic-user', 'unwelcomed'].map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('');
-                tr.innerHTML = `
-                    <td>${u.id}</td>
-                    <td>${u.username}</td>
-                    <td>${u.display_name || ''}</td>
-                    <td>
-                        <select data-user-id="${u.id}" class="role-select"${isSelf ? ' disabled' : ''}>${roleOptions}</select>
-                    </td>
-                    <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
-                `;
-                tbody.appendChild(tr);
+
+        const [users, persons, personLinks] = await Promise.all([getAllUsers(), getPersons(), getPersonLinks()]);
+
+        allPersons = persons;
+        personLinks.forEach(p => { if (p.user_id) personByUserId[p.user_id] = p; });
+
+        const datalist = document.getElementById('persons-datalist');
+        persons.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            datalist.appendChild(opt);
+        });
+
+        const tbody = document.querySelector('#user-table tbody');
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            const isSelf = u.id === user.id;
+            const roleOptions = ['superuser', 'maintainer', 'basic-user', 'unwelcomed']
+                .map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('');
+
+            tr.innerHTML = `
+                <td><input type="checkbox" class="user-check" data-user-id="${u.id}"></td>
+                <td>${u.id}</td>
+                <td>${u.username}</td>
+                <td>${u.display_name || ''}</td>
+                <td><select data-user-id="${u.id}" class="role-select"${isSelf ? ' disabled' : ''}>${roleOptions}</select></td>
+                <td class="person-cell-slot"></td>
+                <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>`;
+            tbody.appendChild(tr);
+            tr.querySelector('.person-cell-slot').replaceWith(buildPersonCell(u.id));
+        });
+
+        document.querySelectorAll('.role-select').forEach(sel => {
+            sel.addEventListener('change', async function () {
+                const userId = this.getAttribute('data-user-id');
+                this.disabled = true;
+                try {
+                    const resp = await fetch(`/api/users/${userId}/role`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ role: this.value }),
+                    });
+                    if (!resp.ok) throw new Error();
+                    this.style.background = '#c8e6c9';
+                } catch {
+                    alert('Failed to update role.');
+                    this.style.background = '#ffcdd2';
+                } finally {
+                    this.disabled = false;
+                    setTimeout(() => { this.style.background = ''; }, 1200);
+                }
             });
-            // Add event listeners for role changes
-            document.querySelectorAll('.role-select').forEach(sel => {
-                sel.addEventListener('change', async function() {
-                    const userId = this.getAttribute('data-user-id');
-                    const newRole = this.value;
-                    this.disabled = true;
-                    try {
-                        const resp = await fetch(`/api/users/${userId}/role`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ role: newRole })
-                        });
-                        if (!resp.ok) throw new Error('Failed to update role');
-                        this.style.background = '#c8e6c9'; // green highlight
-                    } catch (e) {
-                        alert('Failed to update role: ' + e.message);
-                        this.style.background = '#ffcdd2'; // red highlight
-                    } finally {
-                        this.disabled = false;
-                        setTimeout(() => { this.style.background = ''; }, 1200);
-                    }
-                });
+        });
+
+        document.getElementById('select-all').addEventListener('change', function () {
+            document.querySelectorAll('.user-check').forEach(cb => {
+                cb.checked = this.checked;
+                const uid = parseInt(cb.dataset.userId);
+                this.checked ? selectedUserIds.add(uid) : selectedUserIds.delete(uid);
             });
-        } catch (e) {
-            tbody.innerHTML = '<tr><td colspan="5">Failed to load users.</td></tr>';
-        }
+            updateHistogramsBtn();
+        });
+
+        tbody.addEventListener('change', function (e) {
+            if (!e.target.classList.contains('user-check')) return;
+            const uid = parseInt(e.target.dataset.userId);
+            e.target.checked ? selectedUserIds.add(uid) : selectedUserIds.delete(uid);
+            updateHistogramsBtn();
+        });
+
+        document.getElementById('show-histograms-btn').addEventListener('click', showHistograms);
     })();
     </script>
 </body>

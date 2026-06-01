@@ -481,6 +481,18 @@ def api_users():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/users/rating-histogram")
+def api_rating_histogram():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    user_ids = request.args.get("user_ids", "")
+    try:
+        return jsonify(api_client.get_rating_histogram(user_ids))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/users/<int:user_id>/role", methods=["PATCH"])
 def api_update_user_role(user_id):
     user = session.get("user")
