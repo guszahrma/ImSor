@@ -11,7 +11,7 @@ from pathlib import PureWindowsPath
 
 from api_client import ApiClient
 from detector import detect_people
-from config import image_extensions, server_urls
+from config import image_extensions, server_urls, yolo_model
 
 
 def normalize_path(path: str) -> str:
@@ -156,7 +156,7 @@ def _annotate_folder(folder: str, annotation_type: str, client: ApiClient) -> di
             # Check if already annotated with this type
             existing = client.get_annotations(image_id)
             already_done = any(
-                a["annotation_type"] == f"{annotation_type}_bbox" and a["source"] == "ai"
+                a["annotation_type"] == f"{annotation_type}_bbox" and a["source"].startswith("ai")
                 for a in existing
             )
             if already_done:
@@ -178,7 +178,7 @@ def _annotate_folder(folder: str, annotation_type: str, client: ApiClient) -> di
                     image_id=image_id,
                     annotation_type=f"{annotation_type}_bbox",
                     value=json.dumps(det),
-                    source="ai",
+                    source=f"ai:{yolo_model.replace('.pt', '')}",
                 )
 
             total_people += len(detections)

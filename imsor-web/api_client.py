@@ -97,7 +97,8 @@ def delete_annotation(annotation_id: int) -> dict:
 
 def get_bbox_queue() -> list[dict]:
     """Return the bbox annotation queue: images with at least one unnamed person_bbox."""
-    return _request("GET", f"{config.server_url}/annotations/bbox-queue").json()
+    return _request("GET", f"{config.server_url}/annotations/bbox-queue",
+                    params={"active_model": config.active_bbox_model}).json()
 
 
 def get_bbox_image(image_id: int) -> dict:

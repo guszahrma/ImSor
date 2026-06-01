@@ -57,7 +57,7 @@ def main():
 
     rated_ids      = {a["image_id"] for a in all_anns if a["annotation_type"] == "slideshow_rating"}
     skipped_ids    = {a["image_id"] for a in all_anns if a["annotation_type"] == "skip"}
-    annotated_ids  = {a["image_id"] for a in all_anns if a["annotation_type"] == "person_bbox"}
+    annotated_ids  = {a["image_id"] for a in all_anns if a["annotation_type"] == "person_bbox" and a["source"].startswith("ai")}
 
     candidate_ids = list(rated_ids - skipped_ids - annotated_ids)
     print(f"  Rated: {len(rated_ids)}  Skipped: {len(skipped_ids)}  Already annotated: {len(annotated_ids)}")
@@ -101,7 +101,7 @@ def main():
                     image_id=image_id,
                     annotation_type="person_bbox",
                     value=json.dumps(det),
-                    source="ai",
+                    source=f"ai:{args.model.replace('.pt', '')}",
                 )
             except Exception as e:
                 print(f"\n    WARNING: failed to store annotation: {e}")

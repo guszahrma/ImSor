@@ -80,6 +80,7 @@ def submit_cluster_vote(
 
 @router.get("/bbox-queue")
 def bbox_queue(
+    active_model: str | None = Query(None),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
@@ -88,9 +89,10 @@ def bbox_queue(
     Temporary: restricted to images with date_taken >= 2007-11-08."""
     DATE_CUTOFF = datetime(2007, 11, 8)
 
-    anns = db.query(Annotation).filter(
-        Annotation.annotation_type == "person_bbox"
-    ).all()
+    ann_query = db.query(Annotation).filter(Annotation.annotation_type == "person_bbox")
+    if active_model:
+        ann_query = ann_query.filter(Annotation.source == f"ai:{active_model}")
+    anns = ann_query.all()
 
     by_image: dict[int, dict] = {}
     for ann in anns:

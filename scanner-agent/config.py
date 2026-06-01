@@ -1,6 +1,8 @@
 # Scanner Agent configuration
 
-from credentials import central_service_username as username, central_service_password as password
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from local_settings import central_service_username as username, central_service_password as password
 
 # Central Web Service URLs per environment
 server_urls = {
