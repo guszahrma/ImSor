@@ -30,7 +30,8 @@
             gap: 8px;
         }
         #person-panel .hint { font-size: 0.85rem; color: #aaa; }
-        #person-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+        #person-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; align-items: start; }
+        #person-list-shortcuts, #person-list-others { display: flex; flex-direction: column; gap: 3px; }
         #person-list button {
             padding: 3px 8px; font-size: 0.8rem; background: #3a3a6a;
             width: 100%; text-align: left; overflow: hidden;
@@ -618,20 +619,41 @@
         document.getElementById('panel-hint').textContent = selectedAnn
             ? 'Assign a name to the selected box:'
             : 'Click a bounding box to identify the person';
-        for (let i = 0; i < knownPeople.length; i++) {
-            const name = knownPeople[i];
+
+        const shortcuts = knownPeople.slice(0, 10);
+        const others = [...knownPeople.slice(10)].sort((a, b) => a.localeCompare(b));
+
+        function makeBtn(name, shortcutLabel) {
             const btn = document.createElement('button');
             btn.tabIndex = -1;
-            if (i < 10) {
+            if (shortcutLabel !== undefined) {
                 const s = document.createElement('span');
                 s.className = 'shortcut';
-                s.textContent = (i + 1) % 10;
+                s.textContent = shortcutLabel;
                 btn.appendChild(s);
             }
             btn.appendChild(document.createTextNode(name));
             btn.addEventListener('click', () => assignPerson(name));
-            list.appendChild(btn);
+            return btn;
         }
+
+        // Balance: left = 10 shortcuts + head of alpha, right = tail of alpha
+        // Equal when: 10 + leftCount == rightCount → leftCount = max(0, floor((N-10)/2))
+        const leftCount = Math.max(0, Math.floor((others.length - 10) / 2));
+        const leftOthers  = others.slice(0, leftCount);
+        const rightOthers = others.slice(leftCount);
+
+        const leftCol = document.createElement('div');
+        leftCol.id = 'person-list-shortcuts';
+        shortcuts.forEach((name, i) => leftCol.appendChild(makeBtn(name, (i + 1) % 10)));
+        leftOthers.forEach(name => leftCol.appendChild(makeBtn(name)));
+
+        const rightCol = document.createElement('div');
+        rightCol.id = 'person-list-others';
+        rightOthers.forEach(name => rightCol.appendChild(makeBtn(name)));
+
+        list.appendChild(leftCol);
+        list.appendChild(rightCol);
     }
 
     // ── Mouse interaction ──────────────────────────────────────────────────
