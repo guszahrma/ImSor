@@ -565,6 +565,55 @@ def slideshow_queue(
 
     # Shuffle for variety
     random.shuffle(result)
+
+    # Attach Selma's largest bbox per image
+    selma = db.query(Person).filter(Person.name == "Selma Zahr").first()
+    if selma and result:
+        image_ids = {item["image_id"] for item in result}
+
+        # Gather all person_bbox annotations (adoptions + AI) for these images
+        all_bboxes = db.query(Annotation).filter(
+            Annotation.image_id.in_(image_ids),
+            Annotation.annotation_type == "person_bbox",
+        ).all()
+        bbox_ids = [a.id for a in all_bboxes]
+
+        # Find PersonIdentity rows linking to Selma
+        selma_ann_ids: set[int] = set()
+        if bbox_ids:
+            for pi in db.query(PersonIdentity).filter(
+                PersonIdentity.bbox_annotation_id.in_(bbox_ids),
+                PersonIdentity.person_id == selma.id,
+            ).all():
+                selma_ann_ids.add(pi.bbox_annotation_id)
+
+        # Pick the largest Selma bbox per image
+        selma_bbox_by_image: dict[int, dict] = {}
+        for ann in all_bboxes:
+            if ann.id not in selma_ann_ids:
+                continue
+            try:
+                val = json_mod.loads(ann.value)
+                area = val.get("width", 0) * val.get("height", 0)
+                existing = selma_bbox_by_image.get(ann.image_id)
+                if existing is None or area > existing["_area"]:
+                    selma_bbox_by_image[ann.image_id] = {
+                        "x": val["x"], "y": val["y"],
+                        "width": val["width"], "height": val["height"],
+                        "_area": area,
+                    }
+            except (json_mod.JSONDecodeError, KeyError, TypeError):
+                pass
+
+        for item in result:
+            bbox = selma_bbox_by_image.get(item["image_id"])
+            item["selma_bbox"] = (
+                {k: bbox[k] for k in ("x", "y", "width", "height")} if bbox else None
+            )
+    else:
+        for item in result:
+            item["selma_bbox"] = None
+
     return result
 
 

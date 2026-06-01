@@ -146,6 +146,9 @@
         }
         #btn-apply-filter:hover { background: #5a5aaa; }
 
+        /* ── Zoom transition ─────────────────────────────────────────────── */
+        #main-img { transform-origin: 0 0; }
+
         /* ── Age display ─────────────────────────────────────────────────── */
         #age-display {
             position: fixed; left: 0; top: 46px; bottom: 0;
@@ -237,6 +240,23 @@
             </div>
         </div>
 
+        <div class="setting-row" id="zoom-row" style="margin-top: 1.4em;">
+            <label>
+                <input type="checkbox" id="zoom-enabled">
+                Zoom on Selma
+            </label>
+            <div id="zoom-controls" style="margin-top:6px; display:flex; flex-direction:column; gap:6px; opacity:0.35; pointer-events:none; transition:opacity 0.2s;">
+                <label style="font-size:0.82rem; color:#aaa;">
+                    Margin: <span id="zoom-margin-display">30</span>%
+                    <input type="range" id="zoom-margin" min="0" max="80" step="5" value="30" style="width:100%; margin-top:3px;">
+                </label>
+                <label style="font-size:0.82rem; color:#aaa; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="zoom-selma-only">
+                    Only images where Selma has a bbox
+                </label>
+            </div>
+        </div>
+
         <div class="setting-row" style="margin-top: 1.4em;">
             <label for="timer-interval">Speed: <span id="timer-display">5s</span></label>
             <input type="range" id="timer-interval" min="1" max="30" value="5">
@@ -314,6 +334,16 @@
     if (saved.ageMin !== undefined) document.getElementById('age-min').value = saved.ageMin;
     if (saved.ageMax !== undefined) document.getElementById('age-max').value = saved.ageMax;
     updateAgeSliderDisplay();
+    if (saved.zoomEnabled) {
+        document.getElementById('zoom-enabled').checked = true;
+        document.getElementById('zoom-controls').style.opacity = '1';
+        document.getElementById('zoom-controls').style.pointerEvents = '';
+    }
+    if (saved.zoomMargin !== undefined) {
+        document.getElementById('zoom-margin').value = saved.zoomMargin;
+        document.getElementById('zoom-margin-display').textContent = saved.zoomMargin;
+    }
+    if (saved.zoomSelmaOnly) document.getElementById('zoom-selma-only').checked = true;
 
     function saveSettings() {
         localStorage.setItem('slideshow-settings', JSON.stringify({
@@ -322,6 +352,9 @@
             ageFilterEnabled: document.getElementById('age-filter-enabled').checked,
             ageMin:           document.getElementById('age-min').value,
             ageMax:           document.getElementById('age-max').value,
+            zoomEnabled:      document.getElementById('zoom-enabled').checked,
+            zoomMargin:       document.getElementById('zoom-margin').value,
+            zoomSelmaOnly:    document.getElementById('zoom-selma-only').checked,
         }));
     }
 
@@ -359,7 +392,9 @@
 
     function scheduleNext() {
         if (!isPlaying) return;
-        const interval = parseInt(document.getElementById('timer-interval').value) * 1000;
+        const raw = parseInt(document.getElementById('timer-interval').value);
+        const zoomOn = document.getElementById('zoom-enabled').checked;
+        const interval = (zoomOn ? Math.max(raw, 10) : raw) * 1000;
         timerHandle = setTimeout(() => {
             if (isPlaying) {
                 const next = currentIndex < queue.length - 1 ? currentIndex + 1 : 0;
@@ -387,7 +422,7 @@
             return;
         }
         currentIndex = 0;
-        applyAgeFilter(true);
+        applyFilters(true);
     }
 
     function computeAgeDecimal(birthdate, dateTaken) {
@@ -410,18 +445,28 @@
             min === max ? `${min}` : `${min} – ${max}`;
     }
 
-    function applyAgeFilter(autoplay = false) {
-        const enabled = document.getElementById('age-filter-enabled').checked;
-        if (!enabled || !selmaBirthdate) {
-            queue = fullQueue;
-        } else {
+    function applyFilters(autoplay = false) {
+        let filtered = fullQueue;
+
+        // Age filter
+        const ageEnabled = document.getElementById('age-filter-enabled').checked;
+        if (ageEnabled && selmaBirthdate) {
             const minAge = parseFloat(document.getElementById('age-min').value);
             const maxAge = parseFloat(document.getElementById('age-max').value);
-            queue = fullQueue.filter(item => {
+            filtered = filtered.filter(item => {
                 const age = computeAgeDecimal(selmaBirthdate, item.date_taken);
                 return age !== null && age >= minAge && age <= maxAge;
             });
         }
+
+        // Selma-only filter
+        const zoomEnabled = document.getElementById('zoom-enabled').checked;
+        const selmaOnly   = document.getElementById('zoom-selma-only').checked;
+        if (zoomEnabled && selmaOnly) {
+            filtered = filtered.filter(item => item.selma_bbox != null);
+        }
+
+        queue = filtered;
 
         if (queue.length === 0) {
             document.getElementById('main-layout').style.display = 'none';
@@ -437,27 +482,81 @@
         if (autoplay) startAutoplay();
     }
 
+    // Age filter controls
     document.getElementById('age-filter-enabled').addEventListener('change', function () {
         document.getElementById('age-slider-wrap').classList.toggle('disabled', !this.checked);
-        applyAgeFilter();
-        saveSettings();
+        applyFilters(); saveSettings();
     });
-
     document.getElementById('age-min').addEventListener('input', function () {
         const max = parseFloat(document.getElementById('age-max').value);
         if (parseFloat(this.value) > max) this.value = max;
         updateAgeSliderDisplay();
-        if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+        if (document.getElementById('age-filter-enabled').checked) applyFilters();
         saveSettings();
     });
-
     document.getElementById('age-max').addEventListener('input', function () {
         const min = parseFloat(document.getElementById('age-min').value);
         if (parseFloat(this.value) < min) this.value = min;
         updateAgeSliderDisplay();
-        if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+        if (document.getElementById('age-filter-enabled').checked) applyFilters();
         saveSettings();
     });
+
+    // Zoom controls
+    document.getElementById('zoom-enabled').addEventListener('change', function () {
+        const on = this.checked;
+        document.getElementById('zoom-controls').style.opacity      = on ? '1' : '0.35';
+        document.getElementById('zoom-controls').style.pointerEvents = on ? '' : 'none';
+        applyFilters(); saveSettings();
+    });
+    document.getElementById('zoom-margin').addEventListener('input', function () {
+        document.getElementById('zoom-margin-display').textContent = this.value;
+        saveSettings();
+    });
+    document.getElementById('zoom-selma-only').addEventListener('change', function () {
+        applyFilters(); saveSettings();
+    });
+
+    // ── Zoom animation ─────────────────────────────────────────────────────
+    let zoomHandle = null;
+
+    function resetZoom() {
+        if (zoomHandle) { clearTimeout(zoomHandle); zoomHandle = null; }
+        const imgEl = document.getElementById('main-img');
+        imgEl.style.transition = 'none';
+        imgEl.style.transform  = '';
+    }
+
+    function startZoom(bbox) {
+        resetZoom();
+        const timerSec  = Math.max(parseInt(document.getElementById('timer-interval').value), 10);
+        const zoomSec   = timerSec - 2;
+
+        zoomHandle = setTimeout(() => {
+            zoomHandle = null;
+            const imgEl  = document.getElementById('main-img');
+            const imgRect  = imgEl.getBoundingClientRect();
+            const areaEl   = document.getElementById('image-area');
+            const areaRect = areaEl.getBoundingClientRect();
+
+            const scaleX = imgRect.width  / imgEl.naturalWidth;
+            const scaleY = imgRect.height / imgEl.naturalHeight;
+
+            const margin  = parseFloat(document.getElementById('zoom-margin').value) / 100;
+            const targetW = bbox.width  * scaleX * (1 + 2 * margin);
+            const targetH = bbox.height * scaleY * (1 + 2 * margin);
+            const Z = Math.min(areaRect.width / targetW, areaRect.height / targetH);
+
+            // pan so bbox centre lands at area centre (transform-origin: 0 0)
+            const imgX = imgRect.left - areaRect.left;
+            const imgY = imgRect.top  - areaRect.top;
+            const panX = areaRect.width  / 2 - imgX - (bbox.x + bbox.width  / 2) * scaleX * Z;
+            const panY = areaRect.height / 2 - imgY - (bbox.y + bbox.height / 2) * scaleY * Z;
+
+            imgEl.style.transition = `transform ${zoomSec}s ease-in-out`;
+            imgEl.style.transform  = `translate(${panX}px, ${panY}px) scale(${Z})`;
+        }, 2000);
+    }
 
     document.getElementById('btn-apply-filter').addEventListener('click', loadData);
 
@@ -482,10 +581,13 @@
         currentIndex = index;
         const item = queue[index];
         const imgEl = document.getElementById('main-img');
+        resetZoom();
         imgEl.onload = function() {
             const rect = imgEl.getBoundingClientRect();
-            const el = document.getElementById('age-display');
-            el.style.width = Math.max(0, rect.left) + 'px';
+            document.getElementById('age-display').style.width = Math.max(0, rect.left) + 'px';
+            if (document.getElementById('zoom-enabled').checked && item.selma_bbox) {
+                startZoom(item.selma_bbox);
+            }
         };
         imgEl.src = `/serve/${item.image_id}`;
         updateStatus();
@@ -550,8 +652,7 @@
             const selma = persons.find(p => p.name === 'Selma Zahr');
             if (selma) {
                 selmaBirthdate = selma.birthdate;
-                // Re-apply filter now that birthdate is known (in case filter was enabled on load)
-                if (document.getElementById('age-filter-enabled').checked) applyAgeFilter();
+                if (document.getElementById('age-filter-enabled').checked) applyFilters();
             }
         } catch (_) {}
     }
