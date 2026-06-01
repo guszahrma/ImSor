@@ -84,7 +84,10 @@ def bbox_queue(
     _current: User = Depends(get_current_user),
 ):
     """Return images that have at least one unnamed person_bbox, ordered:
-    fully unworked (0 named) first, then partially named; sorted by unnamed_count desc within each group."""
+    fully unworked (0 named) first, then partially named; sorted by unnamed_count desc within each group.
+    Temporary: restricted to images with date_taken >= 2007-11-08."""
+    DATE_CUTOFF = datetime(2007, 11, 8)
+
     anns = db.query(Annotation).filter(
         Annotation.annotation_type == "person_bbox"
     ).all()
@@ -101,10 +104,20 @@ def bbox_queue(
         except (json_mod.JSONDecodeError, TypeError):
             counts["unnamed"] += 1
 
+    # Filter by date_taken cutoff
+    if by_image:
+        images = db.query(Image).filter(
+            Image.id.in_(list(by_image.keys())),
+            Image.date_taken >= DATE_CUTOFF,
+        ).all()
+        eligible_ids = {img.id for img in images}
+    else:
+        eligible_ids = set()
+
     queue = [
         {"image_id": img_id, "named_count": c["named"], "unnamed_count": c["unnamed"]}
         for img_id, c in by_image.items()
-        if c["unnamed"] > 0
+        if c["unnamed"] > 0 and img_id in eligible_ids
     ]
     queue.sort(key=lambda x: (x["named_count"] > 0, -x["unnamed_count"]))
     return queue
