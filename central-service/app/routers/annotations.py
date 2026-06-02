@@ -17,14 +17,41 @@ from ..schemas import (AnnotationCreate, AnnotationOut, AnnotationUpdate, Cluste
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
 
-@router.post("/", response_model=AnnotationOut)
+def _clamp_bbox_value(value_str: str, image: Image) -> str:
+    """Clamp person_bbox coordinates to image bounds. No-op if dimensions unknown."""
+    if not image.image_width or not image.image_height:
+        return value_str
+    try:
+        val = json_mod.loads(value_str)
+        x = max(0, val["x"])
+        y = max(0, val["y"])
+        x = min(x, image.image_width - 1)
+        y = min(y, image.image_height - 1)
+        w = min(val["width"],  image.image_width  - x)
+        h = min(val["height"], image.image_height - y)
+        if w <= 0 or h <= 0:
+            return value_str
+        val["x"] = x
+        val["y"] = y
+        val["width"]  = w
+        val["height"] = h
+        return json_mod.dumps(val)
+    except (json_mod.JSONDecodeError, TypeError, KeyError):
+        return value_str
 
+
+@router.post("/", response_model=AnnotationOut)
 def create_annotation(
     annotation: AnnotationCreate,
     db: Session = Depends(get_db),
     _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
 ):
-    db_annotation = Annotation(**annotation.model_dump())
+    data = annotation.model_dump()
+    if data["annotation_type"] == "person_bbox":
+        image = db.query(Image).filter(Image.id == data["image_id"]).first()
+        if image:
+            data["value"] = _clamp_bbox_value(data["value"], image)
+    db_annotation = Annotation(**data)
     db.add(db_annotation)
     db.commit()
     db.refresh(db_annotation)
@@ -701,7 +728,11 @@ def update_annotation(
     if not ann:
         raise HTTPException(status_code=404, detail="Annotation not found")
     if body.value is not None:
-        ann.value = body.value
+        if ann.annotation_type == "person_bbox":
+            image = db.query(Image).filter(Image.id == ann.image_id).first()
+            ann.value = _clamp_bbox_value(body.value, image) if image else body.value
+        else:
+            ann.value = body.value
     if body.source is not None:
         ann.source = body.source
 

@@ -688,6 +688,7 @@
             ann, boxEl,
             startMouseX: e.clientX, startMouseY: e.clientY,
             origX: val.x, origY: val.y,
+            origW: val.width, origH: val.height,
         };
     }
 
@@ -707,8 +708,8 @@
 
     function startDraw(e) {
         const rect = img.getBoundingClientRect();
-        const dx = (e.clientX - rect.left) / zoom;
-        const dy = (e.clientY - rect.top)  / zoom;
+        const dx = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
+        const dy = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
         drawState = { startDispX: dx, startDispY: dy };
         previewEl = document.createElement('div');
         previewEl.className = 'bbox drawing';
@@ -727,8 +728,10 @@
 
         if (mode === 'dragging') {
             const ds = dragState;
-            const newX = Math.max(0, ds.origX + (e.clientX - ds.startMouseX) / scaleX / zoom);
-            const newY = Math.max(0, ds.origY + (e.clientY - ds.startMouseY) / scaleY / zoom);
+            const imgW = currentImage.image_width  || (img.clientWidth  / scaleX);
+            const imgH = currentImage.image_height || (img.clientHeight / scaleY);
+            const newX = Math.max(0, Math.min(ds.origX + (e.clientX - ds.startMouseX) / scaleX / zoom, imgW - ds.origW));
+            const newY = Math.max(0, Math.min(ds.origY + (e.clientY - ds.startMouseY) / scaleY / zoom, imgH - ds.origH));
             ds.boxEl.style.left = (newX * scaleX) + 'px';
             ds.boxEl.style.top  = (newY * scaleY) + 'px';
             ds.curX = newX; ds.curY = newY;
@@ -750,6 +753,12 @@
                 const ny = Math.min(y + dy, y + h - minSz);
                 h = h - (ny - y); y = ny;
             }
+            const imgW = currentImage.image_width  || (img.clientWidth  / scaleX);
+            const imgH = currentImage.image_height || (img.clientHeight / scaleY);
+            x = Math.max(0, x);
+            y = Math.max(0, y);
+            w = Math.min(w, imgW - x);
+            h = Math.min(h, imgH - y);
             rs.boxEl.style.left   = (x * scaleX) + 'px';
             rs.boxEl.style.top    = (y * scaleY) + 'px';
             rs.boxEl.style.width  = (w * scaleX) + 'px';

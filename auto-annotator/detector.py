@@ -28,6 +28,7 @@ def detect_people(image_path: str) -> list[dict]:
 
     detections = []
     for result in results:
+        img_h, img_w = result.orig_shape
         for box in result.boxes:
             class_id = int(box.cls[0])
             conf = float(box.conf[0])
@@ -37,11 +38,17 @@ def detect_people(image_path: str) -> list[dict]:
                 continue
 
             x1, y1, x2, y2 = box.xyxy[0].tolist()
+            x1 = max(0, min(round(x1), img_w))
+            y1 = max(0, min(round(y1), img_h))
+            x2 = max(0, min(round(x2), img_w))
+            y2 = max(0, min(round(y2), img_h))
+            if x2 <= x1 or y2 <= y1:
+                continue
             detections.append({
-                "x": round(x1),
-                "y": round(y1),
-                "width": round(x2 - x1),
-                "height": round(y2 - y1),
+                "x": x1,
+                "y": y1,
+                "width": x2 - x1,
+                "height": y2 - y1,
                 "confidence": round(conf, 4),
             })
 
