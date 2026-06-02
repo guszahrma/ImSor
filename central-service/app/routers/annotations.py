@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, cast, Float, func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
@@ -139,6 +139,18 @@ def bbox_queue(
     if not ai_anns:
         return []
 
+    # Exclude duplicate copies
+    copy_image_ids: set[int] = set()
+    for dr in db.query(Annotation).filter(Annotation.annotation_type == "duplicate_role").all():
+        try:
+            if int(dr.value) != dr.image_id:
+                copy_image_ids.add(dr.image_id)
+        except (ValueError, TypeError):
+            pass
+    ai_anns = [ann for ann in ai_anns if ann.image_id not in copy_image_ids]
+    if not ai_anns:
+        return []
+
     ai_det_ids = {ann.id for ann in ai_anns}
     ai_by_image: dict[int, list[int]] = {}
     for ann in ai_anns:
@@ -190,6 +202,18 @@ def bbox_queue(
                 return True
         return False
 
+    # Average slideshow_rating per image (for secondary sort within each tier)
+    avg_rows = (
+        db.query(Annotation.image_id, func.avg(cast(Annotation.value, Float)).label("avg"))
+        .filter(
+            Annotation.annotation_type == "slideshow_rating",
+            Annotation.image_id.in_(ai_by_image.keys()),
+        )
+        .group_by(Annotation.image_id)
+        .all()
+    )
+    avg_rating: dict[int, float] = {row.image_id: row.avg for row in avg_rows}
+
     result = []
     for image_id, det_ids in ai_by_image.items():
         total = len(det_ids)
@@ -218,7 +242,7 @@ def bbox_queue(
             "unnamed_count": total - any_count,
         })
 
-    result.sort(key=lambda x: (x["tier"], -x["total_count"]))
+    result.sort(key=lambda x: (x["tier"], -(avg_rating.get(x["image_id"]) or 0), -x["total_count"]))
     return result
 
 

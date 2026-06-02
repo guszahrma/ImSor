@@ -858,6 +858,7 @@
         const ann = selectedAnn;
         const val = JSON.parse(ann.value);
         const wasUnnamed = !val.person_name;
+        const spatialIdx = spatialAnnotations.findIndex(a => a.id === ann.id);
         try {
             const resp = await fetch(`/api/annotations/${ann.id}`, {method: 'DELETE'});
             if (!resp.ok) throw new Error(await resp.text());
@@ -878,8 +879,11 @@
             await showImage(currentIndex);
         } else {
             renderBoxes();
-            document.getElementById('delete-box-btn').style.display = 'none';
             updateStatus();
+            const nextIdx = Math.min(spatialIdx, spatialAnnotations.length - 1);
+            const nextAnn = spatialAnnotations[nextIdx];
+            const el = container.querySelector(`.bbox[data-ann-id="${nextAnn.id}"]`);
+            if (el) { selectBox(nextAnn, el); panToBox(nextAnn); }
         }
     }
 
