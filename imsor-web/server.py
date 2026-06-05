@@ -523,8 +523,9 @@ def api_slideshow_queue():
     if not user:
         return jsonify({"error": "unauthorized"}), 401
     min_rating = request.args.get("min_rating", 7.0, type=float)
+    min_raters = request.args.get("min_raters", 1, type=int)
     try:
-        queue = api_client.get_slideshow_queue(user["id"], min_rating)
+        queue = api_client.get_slideshow_queue(user["id"], min_rating, min_raters)
         return jsonify(queue)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -542,6 +542,7 @@ def rating_queue(
 def slideshow_queue(
     user_id: int,
     min_rating: float = Query(7.0),
+    min_raters: int = Query(1),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
@@ -592,18 +593,22 @@ def slideshow_queue(
         Annotation.annotation_type == "slideshow_rating"
     ).all()
 
-    # Calculate average rating per image
+    # Calculate average rating and distinct rater count per image
     ratings_by_image: dict[int, list[int]] = {}
+    raters_by_image: dict[int, set] = {}
     for r in ratings:
         try:
             val = int(r.value)
             ratings_by_image.setdefault(r.image_id, []).append(val)
+            raters_by_image.setdefault(r.image_id, set()).add(r.user_id)
         except (ValueError, TypeError):
             pass
 
     result = []
     for image in images:
         if image.id in ratings_by_image:
+            if len(raters_by_image.get(image.id, set())) < min_raters:
+                continue
             vals = ratings_by_image[image.id]
             avg = sum(vals) / len(vals) if vals else None
             if avg is not None and avg >= min_rating:

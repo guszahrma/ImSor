@@ -131,10 +131,10 @@ def get_rating_queue(user_id: int) -> list[dict]:
                     params={"user_id": user_id}).json()
 
 
-def get_slideshow_queue(user_id: int, min_rating: float = 7.0) -> list[dict]:
+def get_slideshow_queue(user_id: int, min_rating: float = 7.0, min_raters: int = 1) -> list[dict]:
     """Return images accessible to the user with community average rating, filtered by min_rating."""
     return _request("GET", f"{config.server_url}/annotations/slideshow-queue",
-                    params={"user_id": user_id, "min_rating": min_rating}).json()
+                    params={"user_id": user_id, "min_rating": min_rating, "min_raters": min_raters}).json()
 
 def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()

@@ -228,6 +228,10 @@
             <label for="min-rating">Minimum rating: <span id="rating-display">7</span></label>
             <input type="range" id="min-rating" min="0" max="9" step="0.5" value="7">
         </div>
+        <div class="setting-row" style="margin-top: 0.8em;">
+            <label for="min-raters">Minimum raters: <span id="raters-display">2</span></label>
+            <input type="range" id="min-raters" min="1" max="10" step="1" value="2">
+        </div>
         <button id="btn-apply-filter">Apply &amp; reload</button>
 
         <div class="setting-row" id="age-filter-row" style="margin-top: 1.4em;">
@@ -345,6 +349,10 @@
         document.getElementById('min-rating').value = saved.minRating;
         document.getElementById('rating-display').textContent = saved.minRating;
     }
+    if (saved.minRaters !== undefined) {
+        document.getElementById('min-raters').value = saved.minRaters;
+        document.getElementById('raters-display').textContent = saved.minRaters;
+    }
     if (saved.timerInterval !== undefined) {
         document.getElementById('timer-interval').value = saved.timerInterval;
         document.getElementById('timer-display').textContent = saved.timerInterval + 's';
@@ -381,6 +389,7 @@
     function saveSettings() {
         localStorage.setItem('slideshow-settings', JSON.stringify({
             minRating:        document.getElementById('min-rating').value,
+            minRaters:        document.getElementById('min-raters').value,
             timerInterval:    document.getElementById('timer-interval').value,
             ageFilterEnabled: document.getElementById('age-filter-enabled').checked,
             ageMin:           document.getElementById('age-min').value,
@@ -396,6 +405,11 @@
 
     document.getElementById('min-rating').addEventListener('input', (e) => {
         document.getElementById('rating-display').textContent = e.target.value;
+        saveSettings();
+    });
+
+    document.getElementById('min-raters').addEventListener('input', (e) => {
+        document.getElementById('raters-display').textContent = e.target.value;
         saveSettings();
     });
 
@@ -448,8 +462,9 @@
         stopAutoplay();
         closeHelp();
         const minRating = parseFloat(document.getElementById('min-rating').value);
+        const minRaters = parseInt(document.getElementById('min-raters').value);
         try {
-            const resp = await fetch(`/api/slideshow-queue?min_rating=${minRating}`);
+            const resp = await fetch(`/api/slideshow-queue?min_rating=${minRating}&min_raters=${minRaters}`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             fullQueue = await resp.json();
         } catch (err) {
