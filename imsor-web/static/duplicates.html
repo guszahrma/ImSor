@@ -89,6 +89,15 @@
         .path-common { color: #555; }
         .path-diff   { color: #fff; font-weight: bold; }
 
+        /* Rotate button */
+        .btn-rotate {
+            padding: 3px 10px; font-size: 0.8rem;
+            border: 1px solid #444; border-radius: 4px;
+            cursor: pointer; background: transparent; color: #888;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .btn-rotate:hover { color: #ddd; border-color: #aaa; }
+
         /* Original button */
         .btn-original {
             padding: 6px 18px;
@@ -268,6 +277,8 @@
     // -------------------------------------------------------------------
     let clusters = [];
     let currentIndex = 0;
+    // rotation_correction overrides per image_id (applied on top of exif_orientation)
+    const rotations = new Map();
 
     // voteState: Map<cluster_id, Map<image_id, keeper_id|null>>
     // null = unmarked, same id = Original, other id = Redundant of that image
@@ -450,6 +461,8 @@
             imgEl.alt = img.file_name;
             imgEl.style.maxWidth = maxW + "vw";
             if (isOriginal) imgEl.classList.add("is-original");
+            const rotDeg = ((img.exif_orientation || 0) + (rotations.get(img.id) ?? (img.rotation_correction || 0))) % 360;
+            if (rotDeg) imgEl.style.transform = `rotate(${rotDeg}deg)`;
 
             // Path (with diff highlighting)
             const pathEl = document.createElement("div");
@@ -463,8 +476,15 @@
             btnOrig.textContent = isOriginal ? "✓ Original" : "Set as original";
             btnOrig.onclick = () => toggleOriginal(cid, img.id, images);
 
+            // Rotate button
+            const btnRotate = document.createElement("button");
+            btnRotate.className = "btn-rotate";
+            btnRotate.textContent = "↻ Rotate";
+            btnRotate.onclick = () => rotateImage(img.id, img.exif_orientation || 0);
+
             panel.appendChild(numEl);
             panel.appendChild(imgEl);
+            panel.appendChild(btnRotate);
             panel.appendChild(pathEl);
             panel.appendChild(btnOrig);
 
@@ -607,6 +627,23 @@
     // -------------------------------------------------------------------
     // Keyboard
     // -------------------------------------------------------------------
+    // ── Rotation ───────────────────────────────────────────────────────────
+    async function rotateImage(imageId, exifOrientation) {
+        const current = rotations.get(imageId) ?? 0;
+        const newCorrection = (current + 90) % 360;
+        rotations.set(imageId, newCorrection);
+        showCluster(); // re-render to apply rotation
+        try {
+            await fetch(`/api/rotation/${imageId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ degrees: newCorrection }),
+            });
+        } catch (err) {
+            console.error('Error saving rotation:', err);
+        }
+    }
+
     // ── Help panel ─────────────────────────────────────────────────────────
     function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
     function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }

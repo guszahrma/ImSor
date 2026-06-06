@@ -108,6 +108,8 @@ class ClusterImageOut(BaseModel):
     date_taken: datetime.datetime | None
     image_width: int | None
     image_height: int | None
+    exif_orientation: int = 0
+    rotation_correction: int = 0
     model_config = {"from_attributes": True}
 
 class ClusterOut(BaseModel):

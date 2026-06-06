@@ -131,6 +131,15 @@ def list_clusters(
         for img in db.query(Image).filter(Image.id.in_(all_image_ids)).all()
     }
 
+    # Fetch rotation corrections (global, not per-user)
+    rotation_by_image: dict[int, int] = {
+        a.image_id: int(a.value)
+        for a in db.query(Annotation).filter(
+            Annotation.image_id.in_(all_image_ids),
+            Annotation.annotation_type == "rotation_correction",
+        ).all()
+    }
+
     result = []
     for root, image_ids in groups.items():
         # Filter to images this user can access
@@ -168,10 +177,11 @@ def list_clusters(
 
         annotator_count = len(cluster_user_ids)
 
-        cluster_images = [
-            ClusterImageOut.model_validate(images_by_id[img_id])
-            for img_id in sorted(visible_ids)
-        ]
+        cluster_images = []
+        for img_id in sorted(visible_ids):
+            out = ClusterImageOut.model_validate(images_by_id[img_id])
+            out.rotation_correction = rotation_by_image.get(img_id, 0)
+            cluster_images.append(out)
 
         result.append(ClusterOut(
             cluster_id=min(image_ids),  # stable ID based on full cluster, not just visible slice

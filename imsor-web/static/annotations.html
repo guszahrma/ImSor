@@ -209,6 +209,18 @@
             transform-origin: 0 0;
             cursor: crosshair;
         }
+        /* ── Rotation box ────────────────────────────────────────────────── */
+        #rot-box { position: relative; }
+        #rot-box img {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform-origin: center center;
+        }
+        #rotation-indicator {
+            position: absolute; bottom: 26px; right: 10px;
+            font-size: 0.75rem; color: #7a7aaa;
+            pointer-events: none; z-index: 5;
+        }
         #image-container img {
             display: block;
             border: 2px solid #333; border-radius: 4px;
@@ -317,6 +329,7 @@
 
             <h3>Visibility</h3>
             <table><tbody>
+                <tr><td><kbd>R</kbd></td><td>Rotate image 90° clockwise</td></tr>
                 <tr><td><kbd>B</kbd></td><td>Cycle boxes: all → selected only → hidden</td></tr>
             </tbody></table>
 
@@ -351,7 +364,10 @@
                 <div id="viewport">
                     <div id="zoom-indicator"></div>
                     <div id="image-container">
-                        <img id="main-img" alt="Annotated image">
+                        <div id="rot-box">
+                            <img id="main-img" alt="Annotated image">
+                            <div id="rotation-indicator"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -372,11 +388,14 @@
     // ── DOM refs ───────────────────────────────────────────────────────────
     const container = document.getElementById('image-container');
     const viewport  = document.getElementById('viewport');
+    const rotBox    = document.getElementById('rot-box');
     const img       = document.getElementById('main-img');
 
     // ── State ──────────────────────────────────────────────────────────────
     let queue = [];
     let currentIndex = 0;
+    let rotationDeg = 0;
+    let imgNatW = 0, imgNatH = 0;
     let knownPeople = [];
     let selectedAnn = null;
     let currentAnnotations = [];
@@ -519,36 +538,81 @@
         }
 
         currentImage = data.image;
+        currentImage.rotation_correction = data.rotation_correction ?? 0;
+        rotationDeg = ((currentImage.exif_orientation || 0) + currentImage.rotation_correction) % 360;
         currentAnnotations = data.annotations;
         rebuildSpatialOrder();
         document.getElementById('filepath').textContent = currentImage.file_path;
+        updateRotationIndicator();
 
-        img.onload = function () {
-            // Fit image into viewport at zoom=1
-            const natW = img.naturalWidth;
-            const natH = img.naturalHeight;
-            const vpW  = viewport.clientWidth  - 4;
-            const vpH  = viewport.clientHeight - 4;
-            const fit  = Math.min(1, vpW / natW, vpH / natH);
-            img.style.width  = Math.round(natW * fit) + 'px';
-            img.style.height = Math.round(natH * fit) + 'px';
-
-            scaleX = img.clientWidth  / (currentImage.image_width  || natW);
-            scaleY = img.clientHeight / (currentImage.image_height || natH);
-
-            resetZoom();
-            renderBoxes();
-            autoSelectFirstUnnamed();
-        };
+        img.onload = function () { applyRotationLayout(); };
         img.src = `/serve/${currentImage.id}`;
 
         renderPeopleList();
         prefetchNext();
     }
 
+    function applyRotationLayout() {
+        imgNatW = img.naturalWidth;
+        imgNatH = img.naturalHeight;
+        const vpW  = viewport.clientWidth  - 4;
+        const vpH  = viewport.clientHeight - 4;
+        const rot90 = rotationDeg === 90 || rotationDeg === 270;
+        const effW  = rot90 ? imgNatH : imgNatW;
+        const effH  = rot90 ? imgNatW : imgNatH;
+        const fit   = Math.min(1, vpW / effW, vpH / effH);
+        const displayW = Math.round(effW * fit);
+        const displayH = Math.round(effH * fit);
+        rotBox.style.width  = displayW + 'px';
+        rotBox.style.height = displayH + 'px';
+        img.style.width  = (rot90 ? displayH : displayW) + 'px';
+        img.style.height = (rot90 ? displayW : displayH) + 'px';
+        img.style.transform = `translate(-50%, -50%) rotate(${rotationDeg}deg)`;
+        scaleX = fit;
+        scaleY = fit;
+        resetZoom();
+        renderBoxes();
+        autoSelectFirstUnnamed();
+    }
+
+    function updateRotationIndicator() {
+        const corr = currentImage ? (currentImage.rotation_correction || 0) : 0;
+        document.getElementById('rotation-indicator').textContent = corr ? `↻ ${corr}°` : '';
+    }
+
+    async function setRotation(newCorrection) {
+        currentImage.rotation_correction = newCorrection;
+        rotationDeg = ((currentImage.exif_orientation || 0) + newCorrection) % 360;
+        applyRotationLayout();
+        updateRotationIndicator();
+        try {
+            await fetch(`/api/rotation/${currentImage.id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ degrees: newCorrection }),
+            });
+        } catch (err) {
+            console.error('Error saving rotation:', err);
+        }
+    }
+
     function renderBoxes() {
-        container.querySelectorAll('.bbox').forEach(el => el.remove());
+        rotBox.querySelectorAll('.bbox').forEach(el => el.remove());
         for (const ann of currentAnnotations) addBoxElement(ann);
+    }
+
+    function rotatedBboxCoords(val) {
+        const f = scaleX;
+        switch (rotationDeg) {
+            case 90:
+                return { left: (imgNatH - val.y - val.height) * f, top: val.x * f, width: val.height * f, height: val.width * f };
+            case 180:
+                return { left: (imgNatW - val.x - val.width) * f, top: (imgNatH - val.y - val.height) * f, width: val.width * f, height: val.height * f };
+            case 270:
+                return { left: val.y * f, top: (imgNatW - val.x - val.width) * f, width: val.height * f, height: val.width * f };
+            default:
+                return { left: val.x * f, top: val.y * f, width: val.width * f, height: val.height * f };
+        }
     }
 
     function addBoxElement(ann) {
@@ -556,10 +620,11 @@
         const box = document.createElement('div');
         box.className = 'bbox' + (val.person_name ? ' named' : '');
         if (selectedAnn && ann.id === selectedAnn.id) box.classList.add('selected');
-        box.style.left   = (val.x      * scaleX) + 'px';
-        box.style.top    = (val.y      * scaleY) + 'px';
-        box.style.width  = (val.width  * scaleX) + 'px';
-        box.style.height = (val.height * scaleY) + 'px';
+        const coords = rotatedBboxCoords(val);
+        box.style.left   = coords.left   + 'px';
+        box.style.top    = coords.top    + 'px';
+        box.style.width  = coords.width  + 'px';
+        box.style.height = coords.height + 'px';
         box.dataset.annId = ann.id;
 
         const label = document.createElement('div');
@@ -570,7 +635,7 @@
         box.appendChild(label);
 
         if (selectedAnn && ann.id === selectedAnn.id) addResizeHandles(box);
-        container.appendChild(box);
+        rotBox.appendChild(box);
         return box;
     }
 
@@ -666,6 +731,41 @@
         list.appendChild(rightCol);
     }
 
+    // ── Rotation coordinate helpers ────────────────────────────────────────
+
+    // Convert rotBox display coordinates to original image coordinates
+    function dispToImage(dispX, dispY) {
+        const f = scaleX;
+        switch (rotationDeg) {
+            case 90:  return { x: dispY / f,                   y: imgNatH - dispX / f };
+            case 180: return { x: imgNatW - dispX / f,         y: imgNatH - dispY / f };
+            case 270: return { x: imgNatW - dispY / f,         y: dispX / f };
+            default:  return { x: dispX / f,                   y: dispY / f };
+        }
+    }
+
+    // Convert screen-space mouse delta to image-space delta (accounts for rotation + zoom)
+    function screenDeltaToImage(sdx, sdy) {
+        const f = scaleX * zoom;
+        switch (rotationDeg) {
+            case 90:  return { dx:  sdy / f, dy: -sdx / f };
+            case 180: return { dx: -sdx / f, dy: -sdy / f };
+            case 270: return { dx: -sdy / f, dy:  sdx / f };
+            default:  return { dx:  sdx / f, dy:  sdy / f };
+        }
+    }
+
+    // Map a display-space handle label to the corresponding image-space handle
+    function imageHandleForDisplay(displayHandle) {
+        const maps = {
+            0:   {nw:'nw', ne:'ne', se:'se', sw:'sw'},
+            90:  {nw:'sw', ne:'nw', se:'ne', sw:'se'},
+            180: {nw:'se', ne:'sw', se:'nw', sw:'ne'},
+            270: {nw:'ne', ne:'se', se:'sw', sw:'nw'},
+        };
+        return (maps[rotationDeg] || maps[0])[displayHandle];
+    }
+
     // ── Mouse interaction ──────────────────────────────────────────────────
 
     container.addEventListener('mousedown', e => {
@@ -716,14 +816,14 @@
     }
 
     function startDraw(e) {
-        const rect = img.getBoundingClientRect();
-        const dx = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
-        const dy = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
+        const rect = rotBox.getBoundingClientRect();
+        const dx = Math.max(0, Math.min((e.clientX - rect.left) / zoom, rotBox.clientWidth));
+        const dy = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, rotBox.clientHeight));
         drawState = { startDispX: dx, startDispY: dy };
         previewEl = document.createElement('div');
         previewEl.className = 'bbox drawing';
         previewEl.style.cssText = `left:${dx}px;top:${dy}px;width:0;height:0;`;
-        container.appendChild(previewEl);
+        rotBox.appendChild(previewEl);
         mode = 'drawing';
     }
 
@@ -737,47 +837,50 @@
 
         if (mode === 'dragging') {
             const ds = dragState;
-            const imgW = currentImage.image_width  || (img.clientWidth  / scaleX);
-            const imgH = currentImage.image_height || (img.clientHeight / scaleY);
-            const newX = Math.max(0, Math.min(ds.origX + (e.clientX - ds.startMouseX) / scaleX / zoom, imgW - ds.origW));
-            const newY = Math.max(0, Math.min(ds.origY + (e.clientY - ds.startMouseY) / scaleY / zoom, imgH - ds.origH));
-            ds.boxEl.style.left = (newX * scaleX) + 'px';
-            ds.boxEl.style.top  = (newY * scaleY) + 'px';
+            const imgW = imgNatW;
+            const imgH = imgNatH;
+            const delta = screenDeltaToImage(e.clientX - ds.startMouseX, e.clientY - ds.startMouseY);
+            const newX = Math.max(0, Math.min(ds.origX + delta.dx, imgW - ds.origW));
+            const newY = Math.max(0, Math.min(ds.origY + delta.dy, imgH - ds.origH));
+            const coords = rotatedBboxCoords({ x: newX, y: newY, width: ds.origW, height: ds.origH });
+            ds.boxEl.style.left   = coords.left   + 'px';
+            ds.boxEl.style.top    = coords.top    + 'px';
+            ds.boxEl.style.width  = coords.width  + 'px';
+            ds.boxEl.style.height = coords.height + 'px';
             ds.curX = newX; ds.curY = newY;
 
         } else if (mode === 'resizing') {
             const rs = resizeState;
-            const dx = (e.clientX - rs.startMouseX) / scaleX / zoom;
-            const dy = (e.clientY - rs.startMouseY) / scaleY / zoom;
-            const minSz = 10 / Math.min(scaleX, scaleY);
+            const delta = screenDeltaToImage(e.clientX - rs.startMouseX, e.clientY - rs.startMouseY);
+            const dx = delta.dx, dy = delta.dy;
+            const minSz = 10 / scaleX;
             let {origX: x, origY: y, origW: w, origH: h} = rs;
+            // Map display-space handle to image-space handle so resize is rotation-aware
+            const imgHandle = imageHandleForDisplay(rs.handle);
 
-            if (rs.handle.includes('e')) { w = Math.max(minSz, w + dx); }
-            if (rs.handle.includes('s')) { h = Math.max(minSz, h + dy); }
-            if (rs.handle.includes('w')) {
+            if (imgHandle.includes('e')) { w = Math.max(minSz, w + dx); }
+            if (imgHandle.includes('s')) { h = Math.max(minSz, h + dy); }
+            if (imgHandle.includes('w')) {
                 const nx = Math.min(x + dx, x + w - minSz);
                 w = w - (nx - x); x = nx;
             }
-            if (rs.handle.includes('n')) {
+            if (imgHandle.includes('n')) {
                 const ny = Math.min(y + dy, y + h - minSz);
                 h = h - (ny - y); y = ny;
             }
-            const imgW = currentImage.image_width  || (img.clientWidth  / scaleX);
-            const imgH = currentImage.image_height || (img.clientHeight / scaleY);
-            x = Math.max(0, x);
-            y = Math.max(0, y);
-            w = Math.min(w, imgW - x);
-            h = Math.min(h, imgH - y);
-            rs.boxEl.style.left   = (x * scaleX) + 'px';
-            rs.boxEl.style.top    = (y * scaleY) + 'px';
-            rs.boxEl.style.width  = (w * scaleX) + 'px';
-            rs.boxEl.style.height = (h * scaleY) + 'px';
+            x = Math.max(0, x); y = Math.max(0, y);
+            w = Math.min(w, imgNatW - x); h = Math.min(h, imgNatH - y);
+            const coords = rotatedBboxCoords({ x, y, width: w, height: h });
+            rs.boxEl.style.left   = coords.left   + 'px';
+            rs.boxEl.style.top    = coords.top    + 'px';
+            rs.boxEl.style.width  = coords.width  + 'px';
+            rs.boxEl.style.height = coords.height + 'px';
             rs.curX = x; rs.curY = y; rs.curW = w; rs.curH = h;
 
         } else if (mode === 'drawing' && drawState) {
-            const rect = img.getBoundingClientRect();
-            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
-            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
+            const rect = rotBox.getBoundingClientRect();
+            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, rotBox.clientWidth));
+            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, rotBox.clientHeight));
             const left   = Math.min(ex, drawState.startDispX);
             const top    = Math.min(ey, drawState.startDispY);
             previewEl.style.left   = left + 'px';
@@ -817,13 +920,16 @@
             const ds = drawState; drawState = null;
             if (!ds) return;
 
-            const rect = img.getBoundingClientRect();
-            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, img.clientWidth));
-            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, img.clientHeight));
-            const left   = Math.min(ex, ds.startDispX) / scaleX;
-            const top    = Math.min(ey, ds.startDispY) / scaleY;
-            const width  = Math.abs(ex - ds.startDispX) / scaleX;
-            const height = Math.abs(ey - ds.startDispY) / scaleY;
+            const rect = rotBox.getBoundingClientRect();
+            const ex = Math.max(0, Math.min((e.clientX - rect.left) / zoom, rotBox.clientWidth));
+            const ey = Math.max(0, Math.min((e.clientY - rect.top)  / zoom, rotBox.clientHeight));
+            // Convert two display-space corners to image coordinates
+            const p1 = dispToImage(Math.min(ex, ds.startDispX), Math.min(ey, ds.startDispY));
+            const p2 = dispToImage(Math.max(ex, ds.startDispX), Math.max(ey, ds.startDispY));
+            const left   = Math.max(0, Math.min(p1.x, p2.x));
+            const top    = Math.max(0, Math.min(p1.y, p2.y));
+            const width  = Math.abs(p2.x - p1.x);
+            const height = Math.abs(p2.y - p1.y);
 
             if (width > 5 && height > 5) await createNewBox(left, top, width, height);
         }
@@ -1102,6 +1208,10 @@
             deselectAll(); return;
         }
         if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
+        if (e.key === 'r' || e.key === 'R') {
+            if (currentImage) setRotation(((currentImage.rotation_correction || 0) + 90) % 360);
+            return;
+        }
         if (e.key === 'b' || e.key === 'B') { cycleBoxVisibility(); return; }
         if (e.ctrlKey && e.key === '0') { e.preventDefault(); resetZoom(); return; }
         if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnn) {

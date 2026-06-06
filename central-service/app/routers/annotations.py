@@ -366,7 +366,15 @@ def bbox_image(
         out["value"] = json_mod.dumps(val)
         result_anns.append(out)
 
-    return {"image": ImageOut.model_validate(image), "annotations": result_anns}
+    rot = db.query(Annotation).filter_by(
+        image_id=image_id,
+        annotation_type="rotation_correction",
+    ).first()
+    return {
+        "image": ImageOut.model_validate(image),
+        "annotations": result_anns,
+        "rotation_correction": int(rot.value) if rot else 0,
+    }
 
 
 @router.post("/person-identities", response_model=PersonIdentityOut)
