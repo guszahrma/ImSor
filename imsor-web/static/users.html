@@ -53,6 +53,7 @@
             <a href="/rate">Rate</a>
             <a href="/slideshow">Slideshow</a>
             <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+            <a href="/upload" id="nav-upload" style="display:none">Upload</a>
         </div>
     </div>
     <div id="page-content">
@@ -303,6 +304,7 @@
             const role = data.user?.role;
             if (role === 'maintainer' || role === 'superuser') {
                 document.getElementById('nav-admin').style.display = '';
+                document.getElementById('nav-upload').style.display = '';
             }
         }).catch(() => {});
     })();

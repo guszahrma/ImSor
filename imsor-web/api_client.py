@@ -72,6 +72,40 @@ def get_image(image_id: int) -> dict:
     return _request("GET", f"{config.server_url}/images/{image_id}").json()
 
 
+def find_images_by_checksum(checksum: str) -> list[dict]:
+    return _request("GET", f"{config.server_url}/images/", params={"checksum": checksum}).json()
+
+
+def register_image(file_path: str, file_name: str, file_size: int | None,
+                   checksum: str | None, scanner_host: str | None,
+                   image_responsible_id: int | None = None, **exif) -> dict:
+    return _request("POST", f"{config.server_url}/images/", json={
+        "file_path": file_path,
+        "file_name": file_name,
+        "file_size": file_size,
+        "checksum": checksum,
+        "scanner_host": scanner_host,
+        "image_responsible_id": image_responsible_id,
+        **exif,
+    }).json()
+
+
+def get_unattributed_images(skip: int = 0, limit: int = 100) -> list[dict]:
+    return _request("GET", f"{config.server_url}/images/",
+                    params={"unattributed": True, "skip": skip, "limit": limit}).json()
+
+
+def set_image_responsible(image_id: int, user_id: int | None) -> dict:
+    return _request("PATCH", f"{config.server_url}/images/{image_id}/image-responsible",
+                    json={"user_id": user_id}).json()
+
+
+def create_duplicate_pair(image_a_id: int, image_b_id: int) -> dict:
+    return _request("POST", f"{config.server_url}/duplicates/",
+                    json={"image_a_id": image_a_id, "image_b_id": image_b_id,
+                          "match_type": "checksum"}).json()
+
+
 def get_annotations(image_id: int) -> list[dict]:
     return _request("GET", f"{config.server_url}/annotations/",
                      params={"image_id": image_id}).json()
@@ -81,13 +115,14 @@ def get_all_annotations() -> list[dict]:
     return _request("GET", f"{config.server_url}/annotations/").json()
 
 
-def create_annotation(image_id: int, user_id: int | None, annotation_type: str, value: str) -> dict:
+def create_annotation(image_id: int, user_id: int | None, annotation_type: str, value: str,
+                      source: str = "manual") -> dict:
     return _request("POST", f"{config.server_url}/annotations/", json={
         "image_id": image_id,
         "user_id": user_id,
         "annotation_type": annotation_type,
         "value": value,
-        "source": "manual",
+        "source": source,
     }).json()
 
 
@@ -161,6 +196,15 @@ def get_rating_histogram(user_ids: str) -> list[dict]:
 def get_image_cameras() -> list[dict]:
     """Return distinct (make, model) pairs from the image library."""
     return _request("GET", f"{config.server_url}/admin/image-cameras").json()
+
+def get_camera_model_settings() -> list[dict]:
+    """Return (make, model, skip_exif_rotation) for all distinct cameras in the library."""
+    return _request("GET", f"{config.server_url}/admin/camera-model-settings").json()
+
+def set_camera_model_setting(make: str, model: str, skip_exif_rotation: bool) -> dict:
+    """Upsert the skip_exif_rotation flag for a (make, model) pair."""
+    return _request("PATCH", f"{config.server_url}/admin/camera-model-settings",
+                    json={"make": make, "model": model, "skip_exif_rotation": skip_exif_rotation}).json()
 
 def get_cameras() -> list[dict]:
     return _request("GET", f"{config.server_url}/admin/cameras").json()

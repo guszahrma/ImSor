@@ -1,19 +1,12 @@
 import hashlib
 import os
-from datetime import datetime
-from pathlib import PurePosixPath, PureWindowsPath
+import sys
+from pathlib import Path
 
-from PIL import Image
-from PIL.ExifTags import Base as ExifBase
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared"))
+from imsor_utils import extract_exif, normalize_path  # noqa: E402
 
 from config import checksum_algorithm, image_extensions
-
-
-def normalize_path(path: str) -> str:
-    """Normalize a Windows path to forward-slash UNC format for cross-platform storage.
-    e.g. \\\\server\\share\\folder\\file.jpg -> //server/share/folder/file.jpg
-    """
-    return str(PureWindowsPath(path)).replace("\\", "/")
 
 
 def compute_checksum(file_path: str) -> str:
@@ -22,87 +15,6 @@ def compute_checksum(file_path: str) -> str:
         while chunk := f.read(8192):
             h.update(chunk)
     return h.hexdigest()
-
-
-def _clean_str(value) -> str | None:
-    """Strip NUL bytes and whitespace from EXIF string values."""
-    if value is None:
-        return None
-    if isinstance(value, bytes):
-        value = value.decode("utf-8", errors="replace")
-    return value.replace("\x00", "").strip() or None
-
-
-_EXIF_ORIENTATION_TO_DEGREES = {1: 0, 3: 180, 6: 90, 8: 270}
-
-
-def extract_exif(file_path: str) -> dict:
-    result = {
-        "date_taken": None,
-        "gps_latitude": None,
-        "gps_longitude": None,
-        "camera_make": None,
-        "camera_model": None,
-        "image_width": None,
-        "image_height": None,
-        "exif_orientation": 0,
-    }
-    try:
-        with Image.open(file_path) as img:
-            result["image_width"] = img.width
-            result["image_height"] = img.height
-
-            exif_data = img.getexif()
-            if not exif_data:
-                return result
-
-            # Date taken
-            date_str = _clean_str(exif_data.get(ExifBase.DateTimeOriginal) or exif_data.get(ExifBase.DateTime))
-            if date_str:
-                for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-                    try:
-                        result["date_taken"] = datetime.strptime(date_str, fmt).isoformat()
-                        break
-                    except ValueError:
-                        continue
-
-            # Camera info
-            result["camera_make"] = _clean_str(exif_data.get(ExifBase.Make))
-            result["camera_model"] = _clean_str(exif_data.get(ExifBase.Model))
-
-            # Orientation
-            result["exif_orientation"] = _EXIF_ORIENTATION_TO_DEGREES.get(
-                exif_data.get(ExifBase.Orientation), 0
-            )
-
-            # GPS
-            gps_info = exif_data.get_ifd(0x8825)  # GPSInfo IFD
-            if gps_info:
-                result["gps_latitude"] = _convert_gps(
-                    gps_info.get(2), gps_info.get(1)  # GPSLatitude, GPSLatitudeRef
-                )
-                result["gps_longitude"] = _convert_gps(
-                    gps_info.get(4), gps_info.get(3)  # GPSLongitude, GPSLongitudeRef
-                )
-    except Exception:
-        pass  # Not all formats support EXIF; that's fine
-
-    return result
-
-
-def _convert_gps(coords, ref) -> float | None:
-    if not coords or not ref:
-        return None
-    try:
-        degrees = float(coords[0])
-        minutes = float(coords[1])
-        seconds = float(coords[2])
-        value = degrees + minutes / 60 + seconds / 3600
-        if ref in ("S", "W"):
-            value = -value
-        return value
-    except (TypeError, IndexError, ValueError):
-        return None
 
 
 def find_images(folder: str) -> list[str]:

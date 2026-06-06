@@ -56,6 +56,7 @@ class ImageCreate(BaseModel):
     image_width: int | None = None
     image_height: int | None = None
     exif_orientation: int = 0
+    image_responsible_id: int | None = None
 
 class ImageOut(BaseModel):
     id: int
@@ -73,8 +74,12 @@ class ImageOut(BaseModel):
     image_width: int | None
     image_height: int | None
     exif_orientation: int
+    image_responsible_id: int | None
     created_at: datetime.datetime
     model_config = {"from_attributes": True}
+
+class ImageResponsiblePatch(BaseModel):
+    user_id: int | None
 
 
 # --- Duplicate Pairs ---
@@ -171,6 +176,20 @@ class RotationSet(BaseModel):
 
 class ExifOrientationPatch(BaseModel):
     exif_orientation: int  # 0, 90, 180, or 270
+
+
+# --- Admin: Camera model settings ---
+
+class CameraModelSettingsOut(BaseModel):
+    make: str
+    model: str
+    skip_exif_rotation: bool
+    model_config = {"from_attributes": True}
+
+class CameraModelSettingsPatch(BaseModel):
+    make: str
+    model: str
+    skip_exif_rotation: bool
 
 
 # --- Admin: Cameras ---

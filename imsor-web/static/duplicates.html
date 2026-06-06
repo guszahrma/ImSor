@@ -241,6 +241,7 @@
             <a href="/slideshow">Slideshow</a>
             <a href="/users" id="nav-users" style="display:none">Users</a>
             <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+            <a href="/upload" id="nav-upload" style="display:none">Upload</a>
         </div>
         <button class="btn-nav" id="btn-next" onclick="navigate(1)">Next &#9654;</button>
         <span id="topbar-status"></span>
@@ -302,6 +303,7 @@
         if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
+            document.getElementById('nav-upload').style.display = '';
         }
     }).catch(() => {});
 
@@ -586,10 +588,42 @@
             const imgEl = document.createElement("img");
             imgEl.src = `/serve/${img.id}`;
             imgEl.alt = img.file_name;
-            imgEl.style.maxWidth = maxW + "vw";
             if (isOriginal) imgEl.classList.add("is-original");
             const rotDeg = ((img.exif_orientation || 0) + (rotations.get(img.id) ?? (img.rotation_correction || 0))) % 360;
-            if (rotDeg) imgEl.style.transform = `rotate(${rotDeg}deg)`;
+            const rot90  = rotDeg === 90 || rotDeg === 270;
+            const rawW   = img.image_width;
+            const rawH   = img.image_height;
+
+            let imgNode;
+            if (rot90 && rawW && rawH) {
+                // After 90° rotation the visual dimensions are portrait: w=rawH, h=rawW.
+                // Constrain visual width to maxW vw, then compute rendered (pre-rotation) sizes.
+                const visualW = `${maxW}vw`;
+                const visualH = `${(maxW * rawW / rawH).toFixed(2)}vw`;
+                const rendW   = `${(maxW * rawW / rawH).toFixed(2)}vw`;
+                const rendH   = `${maxW}vw`;
+
+                const wrapper = document.createElement("div");
+                wrapper.style.position = "relative";
+                wrapper.style.display  = "inline-block";
+                wrapper.style.width    = visualW;
+                wrapper.style.height   = visualH;
+                wrapper.style.flexShrink = "0";
+
+                imgEl.style.position  = "absolute";
+                imgEl.style.top       = "50%";
+                imgEl.style.left      = "50%";
+                imgEl.style.width     = rendW;
+                imgEl.style.height    = rendH;
+                imgEl.style.transform = `translate(-50%, -50%) rotate(${rotDeg}deg)`;
+
+                wrapper.appendChild(imgEl);
+                imgNode = wrapper;
+            } else {
+                if (rotDeg) imgEl.style.transform = `rotate(${rotDeg}deg)`;
+                imgEl.style.maxWidth = maxW + "vw";
+                imgNode = imgEl;
+            }
 
             // Path (with diff highlighting)
             const pathEl = document.createElement("div");
@@ -610,7 +644,7 @@
             btnRotate.onclick = () => rotateImage(img.id, img.exif_orientation || 0);
 
             panel.appendChild(numEl);
-            panel.appendChild(imgEl);
+            panel.appendChild(imgNode);
             panel.appendChild(btnRotate);
             panel.appendChild(pathEl);
             panel.appendChild(btnOrig);

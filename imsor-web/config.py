@@ -20,6 +20,13 @@ server_name = "mzahr.asuscomm.com:7331"
 # Maps stored path prefixes (forward-slash UNC) to local mount points.
 # Add an entry here for each network share that holds images.
 # Example: "//zahrdata/Home" -> "/mnt/zahrdata"
+
+# Upload directory — where web-uploaded images are written locally, and the
+# corresponding stored-path prefix recorded in the database.
+upload_root = "/mnt/zahrdata_imsor/Uploads"
+upload_stored_prefix = "//zahrdata/imsor/Uploads"
+
 path_mappings = {
-    "//zahrdata/Home": "/mnt/zahrdata",
+    "//zahrdata/Home": "/mnt/zahrdata_home/",
+    "//zahrdata/imsor": "/mnt/zahrdata_imsor/",
 }

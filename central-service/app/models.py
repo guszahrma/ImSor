@@ -47,9 +47,11 @@ class Image(Base):
     image_height = Column(Integer)
     exif_orientation = Column(Integer, nullable=False, default=0)
 
+    image_responsible_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     public_id = Column(PG_UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    image_responsible = relationship("User", foreign_keys=[image_responsible_id])
     annotations = relationship("Annotation", back_populates="image")
     sharing_permissions = relationship("SharingPermission", back_populates="image")
 
@@ -192,6 +194,19 @@ class CommunityGranter(Base):
 
     __table_args__ = (
         UniqueConstraint("community_id", "user_id", name="uq_community_granter"),
+    )
+
+
+class CameraModelSettings(Base):
+    __tablename__ = "camera_model_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    make = Column(String(200), nullable=False)
+    model = Column(String(200), nullable=False)
+    skip_exif_rotation = Column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        UniqueConstraint("make", "model", name="camera_model_settings_make_model_key"),
     )
 
 

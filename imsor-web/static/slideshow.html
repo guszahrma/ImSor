@@ -229,6 +229,7 @@
             <a href="/rate">Rate</a>
             <a href="/users" id="nav-users" style="display:none">Users</a>
             <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+            <a href="/upload" id="nav-upload" style="display:none">Upload</a>
         </div>
         <button id="btn-next-top">Next &#8594;</button>
         <span id="topbar-counter" style="font-size:0.85rem; color:#ddd; white-space:nowrap; pointer-events:none;"></span>
@@ -362,6 +363,7 @@
         if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
+            document.getElementById('nav-upload').style.display = '';
         }
     }).catch(() => {});
 

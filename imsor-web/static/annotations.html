@@ -306,6 +306,7 @@
                 <a href="/slideshow">Slideshow</a>
                 <a href="/users" id="nav-users" style="display:none">Users</a>
                 <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+                <a href="/upload" id="nav-upload" style="display:none">Upload</a>
             </div>
             <button id="btn-next" onclick="navigate(1)">Next &#9654;</button>
             <div id="status"></div>
@@ -414,6 +415,7 @@
         if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
+            document.getElementById('nav-upload').style.display = '';
         }
     }).catch(() => {});
 

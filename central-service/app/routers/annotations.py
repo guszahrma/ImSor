@@ -189,8 +189,9 @@ def bbox_queue(
     for ann in ai_anns:
         ai_by_image.setdefault(ann.image_id, []).append(ann.id)
 
-    # Load Detection Adoptions, group by the AI detection they inherit from
+    # Load manual bboxes: Detection Adoptions (have inherited_from) and Supplemental Detections (don't)
     adoptions_by_ai: dict[int, list[Annotation]] = defaultdict(list)
+    supplementals_by_image: dict[int, list[int]] = defaultdict(list)  # image_id → annotation IDs
     for ann in db.query(Annotation).filter(
         Annotation.annotation_type == "person_bbox",
         Annotation.source == "manual",
@@ -200,8 +201,11 @@ def bbox_queue(
             parent_id = int(json_mod.loads(ann.value).get("inherited_from", 0))
             if parent_id in ai_det_ids:
                 adoptions_by_ai[parent_id].append(ann)
+                continue
         except (json_mod.JSONDecodeError, TypeError, ValueError):
             pass
+        if ann.image_id in eligible_ids and ann.image_id not in copy_image_ids:
+            supplementals_by_image[ann.image_id].append(ann.id)
 
     # Load person_identities; keep latest per (adoption_id, user_id)
     pi_latest: dict[int, dict[int, PersonIdentity]] = defaultdict(dict)
@@ -235,6 +239,13 @@ def bbox_queue(
                 return True
         return False
 
+    def supplemental_linked_by_anyone(ann_id: int) -> bool:
+        return any(pi.person_id is not None for pi in pi_latest[ann_id].values())
+
+    def supplemental_linked_by(ann_id: int, uid: int) -> bool:
+        pi = pi_latest[ann_id].get(uid)
+        return pi is not None and pi.person_id is not None
+
     # Average slideshow_rating per image (for secondary sort within each tier)
     avg_rows = (
         db.query(Annotation.image_id, func.avg(cast(Annotation.value, Float)).label("avg"))
@@ -249,9 +260,12 @@ def bbox_queue(
 
     result = []
     for image_id, det_ids in ai_by_image.items():
-        total = len(det_ids)
-        any_count  = sum(1 for d in det_ids if identified_by_anyone(d))
-        user_count = sum(1 for d in det_ids if identified_by(d, user_id))
+        supp_ids = supplementals_by_image.get(image_id, [])
+        total = len(det_ids) + len(supp_ids)
+        any_count  = (sum(1 for d in det_ids if identified_by_anyone(d)) +
+                      sum(1 for s in supp_ids if supplemental_linked_by_anyone(s)))
+        user_count = (sum(1 for d in det_ids if identified_by(d, user_id)) +
+                      sum(1 for s in supp_ids if supplemental_linked_by(s, user_id)))
 
         if any_count == 0:
             tier = 1

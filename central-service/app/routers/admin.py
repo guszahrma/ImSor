@@ -5,8 +5,11 @@ from sqlalchemy.orm import Session
 
 from ..auth import require_role
 from ..database import get_db
-from ..models import User, Camera, Person, Annotation, Image
-from ..schemas import CameraCreate, CameraOut, PersonBirthdateUpdate, PersonCreate, PersonOut, UserOut
+from ..models import User, Camera, Person, Annotation, Image, CameraModelSettings
+from ..schemas import (
+    CameraCreate, CameraOut, CameraModelSettingsOut, CameraModelSettingsPatch,
+    PersonBirthdateUpdate, PersonCreate, PersonOut, UserOut,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -26,6 +29,60 @@ def list_image_cameras(
         .all()
     )
     return [{"make": r.camera_make, "model": r.camera_model} for r in rows]
+
+
+# --- Camera model settings (per-make/model EXIF overrides) ---
+
+@router.get("/camera-model-settings", response_model=list[CameraModelSettingsOut])
+def list_camera_model_settings(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    """Return all distinct (make, model) from images, merged with any stored settings."""
+    image_cameras = (
+        db.query(Image.camera_make, Image.camera_model)
+        .filter(Image.camera_make.isnot(None), Image.camera_model.isnot(None))
+        .distinct()
+        .all()
+    )
+    settings_map = {
+        (s.make, s.model): s.skip_exif_rotation
+        for s in db.query(CameraModelSettings).all()
+    }
+    return [
+        CameraModelSettingsOut(
+            make=r.camera_make,
+            model=r.camera_model,
+            skip_exif_rotation=settings_map.get((r.camera_make, r.camera_model), False),
+        )
+        for r in image_cameras
+    ]
+
+
+@router.patch("/camera-model-settings", response_model=CameraModelSettingsOut)
+def upsert_camera_model_setting(
+    data: CameraModelSettingsPatch,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    """Upsert skip_exif_rotation for a (make, model) pair."""
+    setting = (
+        db.query(CameraModelSettings)
+        .filter(CameraModelSettings.make == data.make, CameraModelSettings.model == data.model)
+        .first()
+    )
+    if setting:
+        setting.skip_exif_rotation = data.skip_exif_rotation
+    else:
+        setting = CameraModelSettings(
+            make=data.make, model=data.model, skip_exif_rotation=data.skip_exif_rotation
+        )
+        db.add(setting)
+    db.commit()
+    db.refresh(setting)
+    return CameraModelSettingsOut(
+        make=setting.make, model=setting.model, skip_exif_rotation=setting.skip_exif_rotation
+    )
 
 
 # --- Camera assignments ---
@@ -52,6 +109,19 @@ def create_camera(
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Camera assignment already exists")
+    # Backfill unattributed images if this is now the only Camera record for (make, model)
+    camera_count = (
+        db.query(Camera)
+        .filter(Camera.make == data.make, Camera.model == data.model)
+        .count()
+    )
+    if camera_count == 1:
+        db.query(Image).filter(
+            Image.camera_make == data.make,
+            Image.camera_model == data.model,
+            Image.image_responsible_id.is_(None),
+        ).update({"image_responsible_id": data.user_id})
+        db.commit()
     return cam
 
 

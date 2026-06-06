@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImSor — Upload</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #topbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+            padding: 0 50px;
+        }
+        #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
+        #site-nav { display: flex; gap: 14px; align-items: center; margin-left: 20px; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+        #site-nav a.active { color: #fff; font-weight: 600; }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 20px;
+            gap: 32px;
+        }
+
+        h1 { font-size: 1.4rem; font-weight: 600; color: #ddd; }
+
+        #upload-box {
+            background: #252545;
+            border: 2px dashed #3a3a6a;
+            border-radius: 10px;
+            padding: 48px 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 560px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        #upload-box:hover, #upload-box.drag-over {
+            border-color: #5a5aaa;
+            background: #2e2e5a;
+        }
+        #upload-box .icon { font-size: 2.8rem; }
+        #upload-box p { color: #aaa; font-size: 0.9rem; text-align: center; }
+        #upload-box p span { color: #7a7aee; }
+
+        #file-input { display: none; }
+
+        #file-list {
+            width: 100%;
+            max-width: 560px;
+            font-size: 0.85rem;
+            color: #aaa;
+            min-height: 0;
+        }
+        #file-list p { margin-bottom: 6px; }
+        .file-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-left: 12px; }
+        .file-row span { flex: 1; }
+        .btn-remove {
+            background: none; border: none; color: #666; cursor: pointer;
+            font-size: 1rem; line-height: 1; padding: 0 4px; flex-shrink: 0;
+        }
+        .btn-remove:hover { color: #e74c3c; }
+
+        #upload-btn {
+            padding: 10px 36px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #4a4a8a;
+            color: #fff;
+            font-weight: 600;
+            display: none;
+        }
+        #upload-btn:hover:not(:disabled) { background: #5a5aaa; }
+        #upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #progress-wrap {
+            width: 100%; max-width: 560px;
+            display: none; flex-direction: column; gap: 6px;
+        }
+        #progress-bar-bg {
+            width: 100%; height: 10px;
+            background: #2a2a4a; border-radius: 5px; overflow: hidden;
+        }
+        #progress-bar {
+            height: 100%; width: 0%;
+            background: #5a5aaa; border-radius: 5px;
+            transition: width 0.15s ease;
+        }
+        #progress-label { font-size: 0.85rem; color: #aaa; text-align: center; }
+
+        #results { width: 100%; max-width: 700px; }
+        #results h2 { font-size: 1rem; color: #ccc; margin-bottom: 14px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th {
+            text-align: left; padding: 8px 12px;
+            background: #252545; color: #aaa;
+            border-bottom: 1px solid #3a3a6a;
+        }
+        td { padding: 8px 12px; border-bottom: 1px solid #2a2a4a; }
+        tr:last-child td { border-bottom: none; }
+
+        .status-uploaded { color: #4caf50; }
+        .status-duplicate { color: #ff9800; }
+        .status-rejected, .status-error { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <span id="topbar-title"><a href="/" style="color:inherit;text-decoration:none">ImSor</a></span>
+        <div id="site-nav">
+            <a href="/duplicates">Duplicates</a>
+            <a href="/annotations">Annotations</a>
+            <a href="/rate">Rate</a>
+            <a href="/slideshow">Slideshow</a>
+            <a href="/users" id="nav-users" style="display:none">Users</a>
+            <a href="/admin"  id="nav-admin" style="display:none">Admin</a>
+            <a href="/attribution" id="nav-attribution" style="display:none">Attribution</a>
+            <a href="/upload" class="active">Upload</a>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <h1>Upload images</h1>
+
+        <div id="upload-box">
+            <div class="icon">&#128247;</div>
+            <p>Drag &amp; drop JPEG files here<br>or <span>click to add files</span></p>
+            <p>Click multiple times to build up a batch &mdash; max 50 MB per file</p>
+            <input type="file" id="file-input" multiple accept="image/jpeg,.jpg,.jpeg">
+        </div>
+
+        <button id="upload-btn">Upload</button>
+        <div id="progress-wrap">
+            <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+            <div id="progress-label">Uploading…</div>
+        </div>
+        <div id="file-list"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+    const box       = document.getElementById('upload-box');
+    const fileInput = document.getElementById('file-input');
+    const fileList  = document.getElementById('file-list');
+    const uploadBtn = document.getElementById('upload-btn');
+    const results   = document.getElementById('results');
+
+    // Accumulated across multiple pick sessions (works around MTP single-file limitation)
+    let pendingFiles = [];
+
+    function addFiles(newFiles) {
+        for (const f of newFiles) {
+            const isDupe = pendingFiles.some(p => p.name === f.name && p.size === f.size);
+            if (!isDupe) pendingFiles.push(f);
+        }
+        renderFileList();
+    }
+
+    function clearPending() {
+        pendingFiles = [];
+        fileInput.value = '';
+        renderFileList();
+    }
+
+    box.addEventListener('click', () => fileInput.click());
+    box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drag-over'); });
+    box.addEventListener('dragleave', () => box.classList.remove('drag-over'));
+    box.addEventListener('drop', e => {
+        e.preventDefault();
+        box.classList.remove('drag-over');
+        addFiles(Array.from(e.dataTransfer.files));
+    });
+
+    fileInput.addEventListener('change', () => {
+        addFiles(Array.from(fileInput.files));
+        fileInput.value = '';
+    });
+
+    function renderFileList() {
+        if (!pendingFiles.length) {
+            fileList.innerHTML = '';
+            uploadBtn.style.display = 'none';
+            return;
+        }
+        fileList.innerHTML = '<p>' + pendingFiles.length + ' file' + (pendingFiles.length > 1 ? 's' : '') + ' selected:</p>';
+        pendingFiles.forEach((f, i) => {
+            const row = document.createElement('div');
+            row.className = 'file-row';
+            row.innerHTML = `<span>• ${esc(f.name)} (${formatSize(f.size)})</span>`;
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove';
+            btn.title = 'Remove';
+            btn.textContent = '✕';
+            btn.addEventListener('click', () => {
+                pendingFiles.splice(i, 1);
+                renderFileList();
+            });
+            row.appendChild(btn);
+            fileList.appendChild(row);
+        });
+        uploadBtn.style.display = 'block';
+    }
+
+    const progressWrap  = document.getElementById('progress-wrap');
+    const progressBar   = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+
+    function setProgress(pct, label) {
+        progressBar.style.width = pct + '%';
+        progressLabel.textContent = label;
+    }
+
+    uploadBtn.addEventListener('click', () => {
+        if (!pendingFiles.length) return;
+
+        const formData = new FormData();
+        for (const f of pendingFiles) formData.append('files', f);
+
+        uploadBtn.disabled = true;
+        uploadBtn.style.display = 'none';
+        progressWrap.style.display = 'flex';
+        setProgress(0, 'Uploading…');
+        results.innerHTML = '';
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', e => {
+            if (!e.lengthComputable) return;
+            const pct = Math.round(e.loaded / e.total * 100);
+            setProgress(pct, `Uploading… ${pct}%`);
+        });
+
+        xhr.addEventListener('load', () => {
+            progressWrap.style.display = 'none';
+            uploadBtn.disabled = false;
+            uploadBtn.style.display = 'block';
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (xhr.status !== 200) {
+                    results.innerHTML = `<p style="color:#e74c3c">Error: ${esc(data.error || 'upload failed')}</p>`;
+                    return;
+                }
+                clearPending();
+                renderResults(data);
+            } catch (e) {
+                results.innerHTML = `<p style="color:#e74c3c">Invalid response from server</p>`;
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            progressWrap.style.display = 'none';
+            uploadBtn.disabled = false;
+            uploadBtn.style.display = 'block';
+            results.innerHTML = `<p style="color:#e74c3c">Network error</p>`;
+        });
+
+        xhr.open('POST', '/api/upload');
+        xhr.send(formData);
+    });
+
+    function renderResults(data) {
+        const rows = data.results.map(r => {
+            const cls = 'status-' + r.status;
+            const label = r.status === 'uploaded' ? '&#10003; Uploaded'
+                        : r.status === 'duplicate' ? '&#9888; Duplicate'
+                        : r.status === 'rejected'  ? '&#10007; Rejected'
+                        : '&#10007; Error';
+            return `<tr>
+                <td>${esc(r.filename)}</td>
+                <td class="${cls}">${label}</td>
+                <td>${esc(r.note || '')}</td>
+            </tr>`;
+        }).join('');
+
+        const uploaded = data.results.filter(r => r.status === 'uploaded').length;
+        const dupes    = data.results.filter(r => r.status === 'duplicate').length;
+        const failed   = data.results.filter(r => r.status === 'rejected' || r.status === 'error').length;
+
+        let summary = `${uploaded} uploaded`;
+        if (dupes)   summary += `, ${dupes} duplicate${dupes > 1 ? 's' : ''}`;
+        if (failed)  summary += `, ${failed} failed`;
+
+        results.innerHTML = `
+            <h2>Session ${esc(data.session)} — ${summary}</h2>
+            <table>
+                <thead><tr><th>File</th><th>Status</th><th>Note</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    // Nav role-gating
+    fetch('/api/current_user').then(r => r.json()).then(data => {
+        const role = data.user?.role;
+        if (role === 'maintainer' || role === 'superuser') {
+            document.getElementById('nav-users').style.display = '';
+            document.getElementById('nav-admin').style.display = '';
+        }
+        if (role === 'superuser') {
+            document.getElementById('nav-attribution').style.display = '';
+        }
+    }).catch(() => {});
+    </script>
+</body>
+</html>

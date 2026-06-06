@@ -46,16 +46,22 @@ A separate, manually triggered process that reads all Duplicate Role annotations
 ## Access Model
 
 ### Camera
-A record linking a User to a camera make and model they own, stored as (User, make, model). "Martin's Nikon COOLPIX S510" and "Martina's Nikon COOLPIX S510" are two distinct Camera records even if the physical devices are indistinguishable. When a make+model in an image's EXIF maps to exactly one User's Camera record, that User is the unambiguous Photographer. When it maps to multiple Camera records, Folder Attribution resolves which User's camera took the images. Serial number is a future refinement that would make (make, model, serial) sufficient to identify a specific physical device without needing Folder Attribution.
+A record linking a User to a camera make and model they own, stored as (User, make, model). "Martin's Nikon COOLPIX S510" and "Martina's Nikon COOLPIX S510" are two distinct Camera records even if the physical devices are indistinguishable. When a Camera record is created, central-service retroactively assigns that User as Image Responsible on all Unattributed Images whose EXIF make and model match — but only if exactly one Camera record now exists for that (make, model) combination. Deleting a Camera record does not affect existing Image Responsible assignments. Serial number is a future refinement that would make (make, model, serial) sufficient to identify a specific physical device.
 
-### Folder Attribution
-A superuser-set record that resolves camera ownership ambiguity: "images in this folder path were taken by User X using Camera Y." Attributions inherit downward through subfolders unless overridden at a deeper level. Only needed when two users own cameras of the same make and model.
+### Image Responsible
+The User attributed as the owner of the camera that captured an image. Stored explicitly per image as `image_responsible_id` (nullable). For scanner-registered images, assigned at registration time when exactly one Camera record matches the image's EXIF make and model; left NULL when no Camera record matches or when multiple Camera records match. For images from an Upload Session, set unconditionally to the uploading user — Camera records do not apply. A Superuser may manually assign or reassign Image Responsible on any image via the Attribution Management page. The Image Responsible is the primary authority over their images.
 
-### Photographer
-The User attributed as the owner of the camera that captured an image. Determined by Camera ownership, resolved by Folder Attribution when ambiguous. The Photographer is the primary authority over their images.
+### Unattributed Image
+An image whose `image_responsible_id` is NULL — Image Responsible could not be determined automatically. Occurs when no Camera record matches the image's EXIF make and model, or when multiple Camera records match the same (make, model). Unattributed Images are surfaced to Superusers via the Attribution Management page for manual resolution.
+
+### Attribution Management
+A dedicated page accessible to Superusers listing all Unattributed Images. From this page a Superuser can manually assign an Image Responsible to individual images.
+
+### Upload Session
+A batch of images submitted together by a single user through the web upload interface, in a single form submission. All images in an Upload Session are attributed to the uploading user as Image Responsible unconditionally — Camera records and Folder Attribution do not apply. Each Upload Session is timestamped at the moment the submission begins. Only users with the `maintainer` or `superuser` role may initiate an Upload Session.
 
 ### Default Visibility
-An image is visible only to its Photographer and Superusers by default. Access is closed unless explicitly extended.
+An image is visible only to its Image Responsible and Superusers by default. Access is closed unless explicitly extended.
 
 ### Community
 A named group of Users, scoped to its creator. Uniqueness is per creator — (creator, name) is the key. "Adam's Family" and "Bob's Family" are distinct Communities that happen to share a name. Members may overlap freely.
@@ -64,10 +70,10 @@ A named group of Users, scoped to its creator. Uniqueness is per creator — (cr
 A permission flag that can be granted to any User by a Superuser, regardless of role. A User with this flag can create Communities, name them, add and remove members, and set which other Users are allowed to grant that Community access to images.
 
 ### Access Grant
-A Photographer or Superuser extending visibility of images to a Community. Communities are identified by creator name and community name (e.g. "Adam's Family") to avoid ambiguity. The set of Users who may grant a given Community is controlled by the Community's creator.
+An Image Responsible or Superuser extending visibility of images to a Community. Communities are identified by creator name and community name (e.g. "Adam's Family") to avoid ambiguity. The set of Users who may grant a given Community is controlled by the Community's creator.
 
 ### Veto
-An annotated User's opt-out from having images containing them shared beyond the Photographer and Superuser. A Veto is image-level — one person vetoing an image removes it from all community-visible contexts for all users. The Photographer and Superuser can still view vetoed images in normal mode. Vetoed images are hidden for everyone without exception in Slideshow mode.
+An annotated User's opt-out from having images containing them shared beyond the Image Responsible and Superuser. A Veto is image-level — one person vetoing an image removes it from all community-visible contexts for all users. The Image Responsible and Superuser can still view vetoed images in normal mode. Vetoed images are hidden for everyone without exception in Slideshow mode.
 
 ### Person
 A named individual who appears in images. Stored as a first-class record with a name, an optional birthdate, and an optional link to a User account. Person absorbs the former PersonUserLink table — the user link is now a nullable field on Person rather than a separate join table. A Person with a linked User account is an Annotated User. A Person may have a birthdate without having a User account, and vice versa.
@@ -78,28 +84,31 @@ An AI-produced bounding box asserting that a person appears at a specific locati
 ### Detection Adoption
 A user's version of a Person Detection, created when the user connects a bbox to a Person. Stored as an Annotation with `annotation_type = "person_bbox"`, `source = "manual"`, the adopting user's `user_id`, and a JSON value containing `inherited_from: <original_annotation_id>` plus optional adjusted coordinates. If the user adjusts the bbox geometry, the same row is updated in place (upserted). One Detection Adoption per user per Person Detection. Implicitly confirms the detection location and establishes ownership.
 
+### Supplemental Detection
+A user-drawn bounding box for a person the AI did not detect. Stored as an Annotation with `annotation_type = "person_bbox"`, `source = "manual"`, the drawing user's `user_id`, and a JSON value with spatial coordinates but no `inherited_from` field. A Supplemental Detection is a first-class annotation, not a variant of Detection Adoption — it has no parent Person Detection.
+
 ### Person Identification
-A single annotator's assertion, at a point in time, that the person inside a specific Detection Adoption is a known Person (or is unidentifiable). Stored in a dedicated `person_identities` table referencing the Detection Adoption and a nullable Person record. A null `person_id` means the annotator examined the bbox and could not identify the person. The table is append-only — each new assertion is a new row. The latest row per annotator per Detection Adoption represents that annotator's current belief.
+A single annotator's assertion, at a point in time, that the person inside a specific Detection Adoption or Supplemental Detection is a known Person (or is unidentifiable). Stored in a dedicated `person_identities` table referencing the Detection Adoption or Supplemental Detection and a nullable Person record. A null `person_id` means the annotator examined the bbox and could not identify the person. The table is append-only — each new assertion is a new row. The latest row per annotator per bbox annotation represents that annotator's current belief.
 
 ### Detection Dismissal
 A user's assertion that a specific Person Detection is not relevant — they do not believe a person is present at that location. Stored in a dedicated `person_bbox_dismissals` table. Dismissal is per-user and does not affect other users' views. A Person Detection is permanently deleted only when it has been dismissed by at least 5 users and no Detection Adoption exists from any user.
 
 ### Person Annotation Queue
-The ordered list of images presented to a logged-in annotator for person identification work. Images are assigned to one of five priority tiers based on global identification state and the current annotator's own contributions. The active tier is shown to the annotator. Priority order:
+The ordered list of images presented to a logged-in annotator for person identification work. Images are assigned to one of five priority tiers based on how many bboxes on the image are linked to a Person, globally and by the current annotator. A bbox is a bbox regardless of origin (AI or user-drawn). Priority order:
 
-1. All Person Detections on the image have no Detection Adoption from anyone.
-2. Some (but not all) Person Detections have a Detection Adoption from another user; none from the current user.
-3. All Person Detections have a Detection Adoption from another user; none from the current user.
-4. All Person Detections have a Detection Adoption from another user; the current user has adopted some but not all.
-5. The current user has adopted all Person Detections — revisit in random order.
+1. No bboxes on the image are linked by anyone.
+2. Some (but not all) bboxes are linked by someone; none by the current user.
+3. All bboxes are linked by someone; none by the current user.
+4. The current user has linked some but not all bboxes.
+5. The current user has linked all bboxes — revisit in random order.
 
-"Identified" means the annotator's latest Person Identification for a Detection Adoption has a non-null `person_id`. Display shows AI Person Detections by default, overridden by the user's own Detection Adoption where one exists.
+"Linked" means the annotator's latest Person Identification for that bbox has a non-null `person_id`. Display shows AI Person Detections by default, overridden by the user's own Detection Adoption where one exists.
 
 ### Annotated User
 A User who has been linked by a Superuser to a Person record. Annotated Users may Veto images they appear in. The mechanism by which Annotated Users revoke broader access is to be detailed.
 
 ### Slideshow Mode
-A presentation context in which vetoed images are hidden for all users without exception — including Superusers and Photographers. Privacy is absolute in this mode.
+A presentation context in which vetoed images are hidden for all users without exception — including Superusers and the image's Image Responsible. Privacy is absolute in this mode.
 
 ### Community Member Rights
 A User who can see an image through Community membership may view and annotate it. They cannot extend access to others, revoke access, or delete anything.

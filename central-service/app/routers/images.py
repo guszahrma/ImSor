@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Image, User
-from ..schemas import ImageCreate, ImageOut, ExifOrientationPatch
+from ..models import Camera, Image, User
+from ..schemas import ImageCreate, ImageOut, ExifOrientationPatch, ImageResponsiblePatch
 
 router = APIRouter(prefix="/images", tags=["images"])
 
@@ -15,7 +15,17 @@ def register_image(
     db: Session = Depends(get_db),
     _current: User = Depends(require_role("superuser", "maintainer", "basic-user")),
 ):
-    db_image = Image(**image.model_dump())
+    data = image.model_dump()
+    # Auto-resolve attribution from Camera records if not explicitly provided
+    if data.get("image_responsible_id") is None and data.get("camera_make") and data.get("camera_model"):
+        cameras = (
+            db.query(Camera)
+            .filter(Camera.make == data["camera_make"], Camera.model == data["camera_model"])
+            .all()
+        )
+        if len(cameras) == 1:
+            data["image_responsible_id"] = cameras[0].user_id
+    db_image = Image(**data)
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
@@ -61,6 +71,8 @@ def list_images(
     limit: int = Query(100, ge=1, le=1000),
     scanner_host: str | None = Query(None),
     file_path: str | None = Query(None),
+    checksum: str | None = Query(None),
+    unattributed: bool = Query(False),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
@@ -69,7 +81,27 @@ def list_images(
         query = query.filter(Image.scanner_host == scanner_host)
     if file_path is not None:
         query = query.filter(Image.file_path == file_path)
+    if checksum is not None:
+        query = query.filter(Image.checksum == checksum)
+    if unattributed:
+        query = query.filter(Image.image_responsible_id.is_(None))
     return query.offset(skip).limit(limit).all()
+
+
+@router.patch("/{image_id}/image-responsible", response_model=ImageOut)
+def set_image_responsible(
+    image_id: int,
+    body: ImageResponsiblePatch,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    db_image = db.query(Image).filter(Image.id == image_id).first()
+    if not db_image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    db_image.image_responsible_id = body.user_id
+    db.commit()
+    db.refresh(db_image)
+    return db_image
 
 
 @router.get("/{image_id}", response_model=ImageOut)

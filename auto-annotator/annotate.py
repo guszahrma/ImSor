@@ -7,18 +7,15 @@ import re
 import subprocess
 import signal
 import sys
-from pathlib import PureWindowsPath
+from pathlib import Path
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared"))
+from imsor_utils import normalize_path  # noqa: E402
 
 from api_client import ApiClient
 from detector import detect_people
 from config import image_extensions, server_urls, yolo_model
-
-
-def normalize_path(path: str) -> str:
-    """Normalize a Windows path to forward-slash UNC format for DB lookup.
-    e.g. \\\\server\\share\\folder\\file.jpg -> //server/share/folder/file.jpg
-    """
-    return str(PureWindowsPath(path)).replace("\\", "/")
 
 
 # --- Graceful stop / pause state ---

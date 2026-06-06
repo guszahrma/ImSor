@@ -1,9 +1,13 @@
+import hashlib
 import json
 import mimetypes
 import os
+import re
 import sys
 import ssl
-from pathlib import Path
+import threading
+from datetime import datetime
+from pathlib import Path, PurePosixPath
 
 # Workaround for Python 3.13 SSL UNEXPECTED_EOF_WHILE_READING bug with Google OAuth
 _ssl_ops = (
@@ -18,6 +22,7 @@ if _ssl_ops:
     ssl.SSLContext.wrap_socket = _patched_wrap_socket
 
 sys.path.append(str(Path(__file__).parent.parent / "auto-annotator"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared"))
 
 from flask_dance.consumer import oauth_authorized
 from flask import flash
@@ -25,7 +30,58 @@ from flask import Flask, jsonify, request, send_file, abort, redirect, url_for, 
 from flask_dance.contrib.google import make_google_blueprint, google
 import api_client
 import config
-from pathlib import PurePosixPath, Path
+from imsor_utils import extract_exif
+
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+_YOLO_MODEL_PATH = str(Path(__file__).resolve().parent.parent / "auto-annotator" / "yolov8n.pt")
+_YOLO_SOURCE = "ai:yolov8n"
+_YOLO_CONFIDENCE = 0.5
+_yolo_model = None
+_yolo_lock = threading.Lock()
+
+
+def _get_yolo():
+    global _yolo_model
+    with _yolo_lock:
+        if _yolo_model is None:
+            from ultralytics import YOLO
+            _yolo_model = YOLO(_YOLO_MODEL_PATH)
+    return _yolo_model
+
+
+def _annotate_uploaded_image(image_id: int, file_path: str):
+    try:
+        model = _get_yolo()
+        results = model(file_path, verbose=False)
+        for result in results:
+            img_h, img_w = result.orig_shape
+            for box in result.boxes:
+                if int(box.cls[0]) != 0:
+                    continue
+                conf = float(box.conf[0])
+                if conf < _YOLO_CONFIDENCE:
+                    continue
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                x1 = max(0, min(round(x1), img_w))
+                y1 = max(0, min(round(y1), img_h))
+                x2 = max(0, min(round(x2), img_w))
+                y2 = max(0, min(round(y2), img_h))
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                api_client.create_annotation(
+                    image_id=image_id,
+                    user_id=None,
+                    annotation_type="person_bbox",
+                    value=json.dumps({
+                        "x": x1, "y": y1,
+                        "width": x2 - x1, "height": y2 - y1,
+                        "confidence": round(conf, 4),
+                    }),
+                    source=_YOLO_SOURCE,
+                )
+    except Exception as e:
+        print(f"[auto-annotator] image {image_id}: {e}")
 
 
 def resolve_path(stored_path: str) -> str:
@@ -165,6 +221,25 @@ def api_image_cameras():
     if not user or user.get("role") != "superuser":
         return jsonify({"error": "forbidden"}), 403
     return jsonify(api_client.get_image_cameras())
+
+
+@app.route("/api/admin/camera-model-settings", methods=["GET"])
+def api_get_camera_model_settings():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(api_client.get_camera_model_settings())
+
+
+@app.route("/api/admin/camera-model-settings", methods=["PATCH"])
+def api_patch_camera_model_settings():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.set_camera_model_setting(
+        body["make"], body["model"], body["skip_exif_rotation"]
+    ))
 
 
 @app.route("/api/admin/cameras", methods=["GET"])
@@ -542,6 +617,140 @@ def api_slideshow_queue():
         return jsonify(queue)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/upload")
+def upload_page():
+    user = session.get("user")
+    if not user or user.get("role") not in ("superuser", "maintainer"):
+        abort(403)
+    return send_file(Path(__file__).parent / "static" / "upload.html")
+
+
+@app.route("/attribution")
+def attribution_page():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        abort(403)
+    return send_file(Path(__file__).parent / "static" / "attribution.html")
+
+
+@app.route("/api/attribution/images")
+def api_attribution_images():
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    skip = request.args.get("skip", 0, type=int)
+    limit = request.args.get("limit", 100, type=int)
+    try:
+        return jsonify(api_client.get_unattributed_images(skip=skip, limit=limit))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/attribution/images/<int:image_id>", methods=["PATCH"])
+def api_set_image_responsible(image_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    try:
+        return jsonify(api_client.set_image_responsible(image_id, body.get("user_id")))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    user = session.get("user")
+    if not user or user.get("role") not in ("superuser", "maintainer"):
+        return jsonify({"error": "forbidden"}), 403
+
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"error": "no files provided"}), 400
+
+    safe_username = re.sub(r"[^\w.-]", "_", user.get("email", str(user.get("id", "unknown"))))
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    session_dir = Path(config.upload_root) / safe_username / timestamp
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    results = []
+    for file in files:
+        original_name = file.filename or ""
+        if not original_name:
+            continue
+
+        if not original_name.lower().endswith((".jpg", ".jpeg")):
+            results.append({"filename": original_name, "status": "rejected", "note": "not a JPEG"})
+            continue
+
+        data = file.read()
+        if len(data) > _MAX_UPLOAD_BYTES:
+            results.append({"filename": original_name, "status": "rejected", "note": "exceeds 50 MB"})
+            continue
+
+        safe_name = re.sub(r"[^\w(). -]", "_", Path(original_name).name)
+        dest = session_dir / safe_name
+        counter = 1
+        while dest.exists():
+            dest = session_dir / f"{dest.stem}_{counter}{dest.suffix}"
+            counter += 1
+
+        checksum = hashlib.sha256(data).hexdigest()
+        existing = api_client.find_images_by_checksum(checksum)
+
+        dest.write_bytes(data)
+        exif = extract_exif(str(dest))
+        camera_make = exif.get("camera_make")
+        camera_model = exif.get("camera_model")
+        if camera_make and camera_model:
+            try:
+                settings = api_client.get_camera_model_settings()
+                skip = any(
+                    s["make"] == camera_make and s["model"] == camera_model
+                    and s["skip_exif_rotation"]
+                    for s in settings
+                )
+                if skip:
+                    exif["exif_orientation"] = 0
+            except Exception:
+                pass
+        stored_path = f"{config.upload_stored_prefix}/{safe_username}/{timestamp}/{dest.name}"
+
+        try:
+            registered = api_client.register_image(
+                file_path=stored_path,
+                file_name=dest.name,
+                file_size=len(data),
+                checksum=checksum,
+                scanner_host="imsor-web-upload",
+                image_responsible_id=user.get("id"),
+                **exif,
+            )
+            for dup in existing:
+                try:
+                    api_client.create_duplicate_pair(registered["id"], dup["id"])
+                except Exception:
+                    pass
+            threading.Thread(
+                target=_annotate_uploaded_image,
+                args=(registered["id"], str(dest)),
+                daemon=True,
+            ).start()
+            note = f"duplicate of image #{existing[0]['id']}" if existing else ""
+            status = "duplicate" if existing else "uploaded"
+            results.append({
+                "filename": dest.name,
+                "status": status,
+                "note": note,
+                "image_id": registered["id"],
+            })
+        except Exception as e:
+            dest.unlink(missing_ok=True)
+            results.append({"filename": dest.name, "status": "error", "note": str(e)})
+
+    return jsonify({"session": timestamp, "results": results})
 
 
 if __name__ == "__main__":

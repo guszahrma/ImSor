@@ -79,6 +79,7 @@
             <a href="/slideshow">Slideshow</a>
             <a href="/users" id="nav-users" style="display:none">Users</a>
             <a href="/admin"  id="nav-admin" style="display:none">Admin</a>
+            <a href="/upload" id="nav-upload" style="display:none">Upload</a>
         </div>
     </div>
     <div id="main-content">
@@ -102,6 +103,11 @@
             <div class="icon">&#127910;</div>
             <div class="label">Slideshow</div>
             <div class="desc">Browse highly-rated images with auto-advance</div>
+        </a>
+        <a class="nav-card" id="upload-nav-card" href="/upload" style="display:none;">
+            <div class="icon">&#128228;</div>
+            <div class="label">Upload</div>
+            <div class="desc">Upload images from your device while travelling</div>
         </a>
         <a class="nav-card" id="users-nav-card" href="/users" style="display:none;">
             <div class="icon">&#128101;</div>
@@ -133,10 +139,12 @@
                     </div>
                 `;
                 if (user.role === 'maintainer' || user.role === 'superuser') {
+                    document.getElementById('upload-nav-card').style.display = '';
                     document.getElementById('users-nav-card').style.display = '';
                     document.getElementById('admin-nav-card').style.display = '';
                     document.getElementById('nav-users').style.display = '';
                     document.getElementById('nav-admin').style.display = '';
+                    document.getElementById('nav-upload').style.display = '';
                 }
             } else {
                 section.innerHTML = `

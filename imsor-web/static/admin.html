@@ -77,6 +77,7 @@
       <a href="/rate">Rate</a>
       <a href="/slideshow">Slideshow</a>
       <a href="/users" id="nav-users" style="display:none">Users</a>
+      <a href="/upload" id="nav-upload" style="display:none">Upload</a>
     </div>
   </div>
   <div id="page-content">
@@ -129,7 +130,17 @@
       </div>
     </section>
 
-    <!-- ── Section 3: Communities ── -->
+    <!-- ── Section 3: Camera model settings ── -->
+    <section id="section-camera-model-settings">
+      <h2>Camera model settings</h2>
+      <p style="font-size:0.85em;color:#888">Per-camera EXIF rotation overrides. Enable <em>Skip EXIF rotation</em> for cameras that write an incorrect orientation tag (pixels are already correctly oriented).</p>
+      <table id="camera-model-settings-table">
+        <thead><tr><th>Make</th><th>Model</th><th>Skip EXIF rotation</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ── Section 4: Communities ── -->
     <section id="section-communities">
       <h2>Communities</h2>
       <p style="font-size:0.85em;color:#888">Communities are scoped to their creator. Each has members (who can view) and granters (users allowed to grant this community access to images).</p>
@@ -159,6 +170,7 @@
     let allPersons = [];
     let imageCameras = [];
     let cameras = [];
+    let cameraModelSettings = [];
     let personLinks = [];
     let communities = [];
     let currentUserId = null;
@@ -304,6 +316,41 @@
       await api('DELETE', `/api/admin/cameras/${id}`);
       cameras = cameras.filter(c => c.id !== id);
       renderCameras();
+    }
+
+    // ── Camera model settings ──
+
+    function renderCameraModelSettings() {
+      const tbody = document.querySelector('#camera-model-settings-table tbody');
+      tbody.innerHTML = '';
+      for (const s of cameraModelSettings) {
+        const tr = document.createElement('tr');
+        const checked = s.skip_exif_rotation ? 'checked' : '';
+        tr.innerHTML = `
+          <td>${s.make}</td>
+          <td>${s.model}</td>
+          <td>
+            <label class="toggle">
+              <input type="checkbox" ${checked} onchange="toggleSkipExifRotation(${JSON.stringify(s.make)}, ${JSON.stringify(s.model)}, this.checked)">
+              <span>${s.skip_exif_rotation ? 'Yes' : 'No'}</span>
+            </label>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+      if (cameraModelSettings.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="3" style="color:#666;font-size:0.9em">No cameras in image library yet.</td>';
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function toggleSkipExifRotation(make, model, value) {
+      try {
+        const updated = await api('PATCH', '/api/admin/camera-model-settings', { make, model, skip_exif_rotation: value });
+        const entry = cameraModelSettings.find(s => s.make === make && s.model === model);
+        if (entry) entry.skip_exif_rotation = updated.skip_exif_rotation;
+        renderCameraModelSettings();
+      } catch(e) { alert('Failed to save: ' + e.message); }
     }
 
     // ── Communities ──
@@ -493,14 +540,16 @@
       const role = me.user.role;
       if (role === 'maintainer' || role === 'superuser') {
         document.getElementById('nav-users').style.display = '';
+        document.getElementById('nav-upload').style.display = '';
       }
 
-      [allUsers, personNames, allPersons, imageCameras, cameras, personLinks, communities] = await Promise.all([
+      [allUsers, personNames, allPersons, imageCameras, cameras, cameraModelSettings, personLinks, communities] = await Promise.all([
         api('GET', '/api/users'),
         api('GET', '/api/admin/person-names'),
         api('GET', '/api/admin/persons'),
         api('GET', '/api/admin/image-cameras'),
         api('GET', '/api/admin/cameras'),
+        api('GET', '/api/admin/camera-model-settings'),
         api('GET', '/api/admin/person-links'),
         api('GET', '/api/communities'),
       ]);
@@ -511,6 +560,7 @@
       renderPersonBirthdates();
       renderPersonLinks();
       renderCameras();
+      renderCameraModelSettings();
       renderCommunities();
       renderCommunityAccess();
     }

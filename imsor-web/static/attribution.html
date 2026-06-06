@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ImSor — Attribution</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #topbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+            padding: 0 50px;
+        }
+        #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
+        #site-nav { display: flex; gap: 14px; align-items: center; margin-left: 20px; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+        #site-nav a.active { color: #fff; font-weight: 600; }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            gap: 24px;
+        }
+
+        h1 { font-size: 1.4rem; font-weight: 600; color: #ddd; }
+        #subtitle { color: #888; font-size: 0.9rem; }
+
+        #controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        #assign-all-wrap { display: flex; gap: 10px; align-items: center; margin-left: auto; }
+        #assign-all-select {
+            background: #252545; border: 1px solid #3a3a6a;
+            color: #e0e0e0; padding: 6px 10px; border-radius: 5px; font-size: 0.88rem;
+        }
+        #assign-all-btn {
+            padding: 6px 16px; background: #4a4a8a; color: #fff; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 0.88rem; font-weight: 600;
+        }
+        #assign-all-btn:hover { background: #5a5aaa; }
+        #assign-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #table-wrap { width: 100%; max-width: 900px; overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        th {
+            text-align: left; padding: 8px 10px;
+            background: #252545; color: #aaa;
+            border-bottom: 1px solid #3a3a6a;
+        }
+        td { padding: 8px 10px; border-bottom: 1px solid #2a2a4a; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr.assigned { opacity: 0.4; }
+
+        .thumb {
+            width: 56px; height: 56px; object-fit: cover;
+            border-radius: 4px; display: block; background: #252545;
+        }
+        .fname { color: #ddd; word-break: break-all; }
+        .meta { color: #888; font-size: 0.82rem; }
+
+        select.user-select {
+            background: #252545; border: 1px solid #3a3a6a;
+            color: #e0e0e0; padding: 5px 8px; border-radius: 5px;
+            font-size: 0.85rem; min-width: 140px;
+        }
+        button.assign-btn {
+            padding: 5px 14px; background: #4a4a8a; color: #fff; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+        }
+        button.assign-btn:hover { background: #5a5aaa; }
+        button.assign-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #load-more-wrap { display: none; }
+        #load-more-btn {
+            padding: 8px 28px; background: #252545; color: #aaa; border: 1px solid #3a3a6a;
+            border-radius: 5px; cursor: pointer; font-size: 0.9rem;
+        }
+        #load-more-btn:hover { background: #2e2e5a; color: #ddd; }
+
+        #status-msg { color: #aaa; font-size: 0.9rem; }
+        .ok-tick { color: #4caf50; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div id="topbar">
+        <span id="topbar-title"><a href="/" style="color:inherit;text-decoration:none">ImSor</a></span>
+        <div id="site-nav">
+            <a href="/duplicates">Duplicates</a>
+            <a href="/annotations">Annotations</a>
+            <a href="/rate">Rate</a>
+            <a href="/slideshow">Slideshow</a>
+            <a href="/users" id="nav-users" style="display:none">Users</a>
+            <a href="/admin"  id="nav-admin" style="display:none">Admin</a>
+            <a href="/upload" id="nav-upload" style="display:none">Upload</a>
+            <a href="/attribution" class="active">Attribution</a>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <h1>Image Attribution</h1>
+        <p id="subtitle">Assign Image Responsible to unattributed images</p>
+
+        <div id="controls">
+            <span id="status-msg">Loading…</span>
+            <div id="assign-all-wrap" style="display:none">
+                <select id="assign-all-select"><option value="">— assign all visible to —</option></select>
+                <button id="assign-all-btn" disabled>Assign all</button>
+            </div>
+        </div>
+
+        <div id="table-wrap">
+            <table id="img-table" style="display:none">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>File</th>
+                        <th>Date taken</th>
+                        <th>Camera</th>
+                        <th>Image Responsible</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="img-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="load-more-wrap">
+            <button id="load-more-btn">Load more</button>
+        </div>
+    </div>
+
+    <script>
+    const BATCH = 100;
+    let skip = 0;
+    let allUsers = [];
+    let rows = [];  // {imageId, trEl}
+
+    const tbody      = document.getElementById('img-tbody');
+    const table      = document.getElementById('img-table');
+    const statusMsg  = document.getElementById('status-msg');
+    const loadMoreWrap = document.getElementById('load-more-wrap');
+    const loadMoreBtn  = document.getElementById('load-more-btn');
+    const assignAllWrap   = document.getElementById('assign-all-wrap');
+    const assignAllSelect = document.getElementById('assign-all-select');
+    const assignAllBtn    = document.getElementById('assign-all-btn');
+
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '—';
+        return iso.slice(0, 10);
+    }
+
+    function buildUserOptions(selectedId) {
+        return allUsers.map(u =>
+            `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${esc(u.display_name || u.username)}</option>`
+        ).join('');
+    }
+
+    function addRow(img) {
+        const tr = document.createElement('tr');
+        const camera = [img.camera_make, img.camera_model].filter(Boolean).join(' ') || '—';
+        tr.innerHTML = `
+            <td><img class="thumb" src="/serve/${img.id}" alt="" loading="lazy"></td>
+            <td class="fname">${esc(img.file_name)}</td>
+            <td class="meta">${fmtDate(img.date_taken)}</td>
+            <td class="meta">${esc(camera)}</td>
+            <td>
+                <select class="user-select">
+                    <option value="">— select —</option>
+                    ${buildUserOptions(null)}
+                </select>
+            </td>
+            <td>
+                <button class="assign-btn" disabled>Assign</button>
+                <span class="ok-tick" style="display:none">&#10003;</span>
+            </td>`;
+
+        const sel = tr.querySelector('select.user-select');
+        const btn = tr.querySelector('button.assign-btn');
+        const tick = tr.querySelector('.ok-tick');
+
+        sel.addEventListener('change', () => {
+            btn.disabled = !sel.value;
+        });
+
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+                await patchImageResponsible(img.id, parseInt(sel.value));
+                tr.classList.add('assigned');
+                sel.disabled = true;
+                btn.style.display = 'none';
+                tick.style.display = '';
+            } catch (e) {
+                btn.disabled = false;
+                alert('Error: ' + e.message);
+            }
+        });
+
+        tbody.appendChild(tr);
+        rows.push({imageId: img.id, trEl: tr, selEl: sel, btnEl: btn, tickEl: tick});
+    }
+
+    async function patchImageResponsible(imageId, userId) {
+        const resp = await fetch(`/api/attribution/images/${imageId}`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user_id: userId}),
+        });
+        if (!resp.ok) {
+            const d = await resp.json().catch(() => ({}));
+            throw new Error(d.error || resp.statusText);
+        }
+        return resp.json();
+    }
+
+    async function loadBatch() {
+        loadMoreBtn.disabled = true;
+        try {
+            const resp = await fetch(`/api/attribution/images?skip=${skip}&limit=${BATCH}`);
+            const imgs = await resp.json();
+            if (imgs.error) { statusMsg.textContent = 'Error: ' + imgs.error; return; }
+
+            if (imgs.length === 0 && skip === 0) {
+                statusMsg.textContent = 'No unattributed images.';
+                return;
+            }
+
+            imgs.forEach(addRow);
+            skip += imgs.length;
+            const total = rows.length;
+            statusMsg.textContent = `${total} unattributed image${total !== 1 ? 's' : ''}${imgs.length === BATCH ? '+' : ''}`;
+            table.style.display = '';
+
+            loadMoreWrap.style.display = imgs.length === BATCH ? '' : 'none';
+            loadMoreBtn.disabled = false;
+
+            if (allUsers.length > 0) {
+                assignAllWrap.style.display = '';
+            }
+        } catch (e) {
+            statusMsg.textContent = 'Failed to load: ' + e.message;
+        }
+    }
+
+    async function loadUsers() {
+        const resp = await fetch('/api/users');
+        const data = await resp.json();
+        allUsers = Array.isArray(data) ? data : [];
+        // Populate assign-all select
+        allUsers.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.display_name || u.username;
+            assignAllSelect.appendChild(opt);
+        });
+        // Rebuild existing row selects
+        rows.forEach(({selEl}) => {
+            const cur = selEl.value;
+            selEl.innerHTML = '<option value="">— select —</option>' + buildUserOptions(null);
+            selEl.value = cur;
+        });
+    }
+
+    assignAllSelect.addEventListener('change', () => {
+        assignAllBtn.disabled = !assignAllSelect.value;
+    });
+
+    assignAllBtn.addEventListener('click', async () => {
+        const userId = parseInt(assignAllSelect.value);
+        if (!userId) return;
+        const unassigned = rows.filter(r => !r.trEl.classList.contains('assigned'));
+        if (!unassigned.length) return;
+        assignAllBtn.disabled = true;
+        for (const r of unassigned) {
+            try {
+                await patchImageResponsible(r.imageId, userId);
+                r.trEl.classList.add('assigned');
+                r.selEl.disabled = true;
+                r.btnEl.style.display = 'none';
+                r.tickEl.style.display = '';
+            } catch (e) {
+                // continue on error
+            }
+        }
+        assignAllBtn.disabled = false;
+    });
+
+    loadMoreBtn.addEventListener('click', loadBatch);
+
+    // Init
+    Promise.all([loadUsers(), loadBatch()]).then(() => {
+        if (allUsers.length > 0 && rows.length > 0) assignAllWrap.style.display = '';
+    });
+
+    // Nav role-gating
+    fetch('/api/current_user').then(r => r.json()).then(data => {
+        const role = data.user?.role;
+        if (role === 'maintainer' || role === 'superuser') {
+            document.getElementById('nav-users').style.display = '';
+            document.getElementById('nav-admin').style.display = '';
+            document.getElementById('nav-upload').style.display = '';
+        }
+    }).catch(() => {});
+    </script>
+</body>
+</html>
