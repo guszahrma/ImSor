@@ -721,15 +721,21 @@
 
     // ── Zoom animation ─────────────────────────────────────────────────────
     let zoomHandle = null;
+    let imgRotationDeg = 0;            // current image's combined rotation (exif + correction)
     let zoomTarget = null;             // {transform, duration} once computed
     let zoomDelayStartedAt = null;     // when the 2s pre-zoom delay began
     let zoomTransitionStartedAt = null; // when the CSS transition began
+
+    function makeTransform(zoomTransform) {
+        const rot = imgRotationDeg ? `rotate(${imgRotationDeg}deg)` : '';
+        return [rot, zoomTransform].filter(Boolean).join(' ');
+    }
 
     function resetZoom() {
         if (zoomHandle) { clearTimeout(zoomHandle); zoomHandle = null; }
         const imgEl = document.getElementById('main-img');
         imgEl.style.transition = 'none';
-        imgEl.style.transform  = '';
+        imgEl.style.transform  = makeTransform('');
         zoomTarget = null;
         zoomDelayStartedAt = null;
         zoomTransitionStartedAt = null;
@@ -767,7 +773,7 @@
             if (remaining > 0) {
                 imgEl.offsetHeight; // force reflow so browser sees frozen position
                 imgEl.style.transition = `transform ${remaining}s ease-out`;
-                imgEl.style.transform  = zoomTarget.transform;
+                imgEl.style.transform  = makeTransform(zoomTarget.transform);
             }
         }
     }
@@ -814,7 +820,7 @@
             };
             zoomTransitionStartedAt = Date.now();
             imgEl.style.transition = `transform ${zoomSec}s ease-in-out`;
-            imgEl.style.transform  = zoomTarget.transform;
+            imgEl.style.transform  = makeTransform(zoomTarget.transform);
         }, 2000);
     }
 
@@ -841,6 +847,7 @@
         currentIndex = index;
         const item = queue[index];
         if (item?.public_id) history.replaceState(null, '', '?id=' + item.public_id);
+        imgRotationDeg = ((item.exif_orientation || 0) + (item.rotation_correction || 0)) % 360;
         const imgEl = document.getElementById('main-img');
         resetZoom();
         imgEl.onload = function() {

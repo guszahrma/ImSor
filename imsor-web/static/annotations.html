@@ -698,6 +698,9 @@
 
     async function setRotation(newCorrection) {
         currentImage.rotation_correction = newCorrection;
+        // Keep the cached top-level rotation_correction in sync so back-navigation restores it
+        const cached = imageCache.get(currentImage.id);
+        if (cached) cached.rotation_correction = newCorrection;
         rotationDeg = ((currentImage.exif_orientation || 0) + newCorrection) % 360;
         applyRotationLayout();
         updateRotationIndicator();

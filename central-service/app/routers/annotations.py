@@ -646,6 +646,22 @@ def slideshow_queue(
                     "longitude":  image.gps_longitude,
                 })
 
+    # Fetch rotation corrections
+    image_ids_in_result = {item["image_id"] for item in result}
+    rotations_map: dict[int, int] = {
+        a.image_id: int(a.value)
+        for a in db.query(Annotation).filter(
+            Annotation.annotation_type == "rotation_correction",
+            Annotation.image_id.in_(image_ids_in_result),
+        ).all()
+        if a.value
+    }
+    images_map: dict[int, Image] = {img.id: img for img in images if img.id in image_ids_in_result}
+    for item in result:
+        iid = item["image_id"]
+        item["exif_orientation"]   = images_map[iid].exif_orientation or 0
+        item["rotation_correction"] = rotations_map.get(iid, 0)
+
     # Shuffle for variety
     random.shuffle(result)
 
