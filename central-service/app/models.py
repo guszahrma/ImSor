@@ -1,8 +1,10 @@
 import datetime
+import uuid
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Date, ForeignKey, Text,
     UniqueConstraint, Boolean,
 )
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -45,6 +47,7 @@ class Image(Base):
     image_height = Column(Integer)
     exif_orientation = Column(Integer, nullable=False, default=0)
 
+    public_id = Column(PG_UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     annotations = relationship("Annotation", back_populates="image")

@@ -479,6 +479,7 @@
     }).catch(() => {});
 
     // ── State ──────────────────────────────────────────────────────────────
+    let _pendingUrlId = new URLSearchParams(location.search).get('id');
     let fullQueue = [];
     let queue = [];          // [{image_id, rating, annotation_id, veto_annotation_id}, …]
     let skippedIds = new Set();
@@ -608,7 +609,20 @@
             document.getElementById('loading').textContent = 'Error loading: ' + err.message;
             return;
         }
-        applyDateFilter();
+        let targetId = null;
+        if (_pendingUrlId) {
+            const t = fullQueue.find(item => item.public_id === _pendingUrlId);
+            if (t) {
+                if (!passesDateFilter(t.date_taken, document.getElementById('date-from').value, document.getElementById('date-to').value)) {
+                    document.getElementById('date-from').value = '';
+                    document.getElementById('date-to').value = '';
+                    saveSettings();
+                }
+                targetId = t.image_id;
+            }
+            _pendingUrlId = null;
+        }
+        applyDateFilter(targetId);
     }
 
     function updateStatus() {
@@ -637,6 +651,7 @@
     async function showImage(index) {
         currentIndex = index;
         const item = queue[index];
+        if (item.public_id) history.replaceState(null, '', '?id=' + item.public_id);
         rotationDeg = ((item.exif_orientation || 0) + (item.rotation_correction || 0)) % 360;
         img.onload = function () { applyRotationLayout(); };
         img.src = `/serve/${item.image_id}`;

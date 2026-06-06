@@ -308,6 +308,7 @@
     // -------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------
+    let _pendingUrlId = new URLSearchParams(location.search).get('id');
     let fullClusters = [];
     let clusters = [];
     let currentIndex = 0;
@@ -333,7 +334,7 @@
         return true;
     }
 
-    function applyDateFilter() {
+    function applyDateFilter(targetImageId = null) {
         if (fullClusters.length === 0) return;  // not yet loaded
         const dateFrom = document.getElementById('date-from').value;
         const dateTo   = document.getElementById('date-to').value;
@@ -354,6 +355,10 @@
             });
         }
         currentIndex = 0;
+        if (targetImageId !== null) {
+            const ci = clusters.findIndex(c => c.images.some(img => img.id === targetImageId));
+            if (ci !== -1) currentIndex = ci;
+        }
         document.getElementById("loading").style.display = "none";
         document.getElementById("progress-wrap").style.display = "block";
         if (clusters.length === 0) {
@@ -418,7 +423,23 @@
         }
         document.getElementById("progress-wrap").style.display = "block";
         document.getElementById("action-bar").style.display = "flex";
-        applyDateFilter();
+        let targetId = null;
+        if (_pendingUrlId) {
+            for (const c of fullClusters) {
+                const img = c.images.find(i => i.public_id === _pendingUrlId);
+                if (img) {
+                    if (!passesDateFilter(img.date_taken, document.getElementById('date-from').value, document.getElementById('date-to').value)) {
+                        document.getElementById('date-from').value = '';
+                        document.getElementById('date-to').value = '';
+                        saveSettings();
+                    }
+                    targetId = img.id;
+                    break;
+                }
+            }
+            _pendingUrlId = null;
+        }
+        applyDateFilter(targetId);
     }
 
     // -------------------------------------------------------------------
@@ -515,8 +536,9 @@
         updateStatus();
         render();
         updateProgress();
-        const firstDate = clusters[currentIndex]?.images[0]?.date_taken;
-        document.getElementById('topbar-date').textContent = firstDate?.slice(0, 10) ?? '';
+        const img0 = clusters[currentIndex]?.images[0];
+        document.getElementById('topbar-date').textContent = img0?.date_taken?.slice(0, 10) ?? '';
+        if (img0?.public_id) history.replaceState(null, '', '?id=' + img0.public_id);
     }
 
     function updateStatus() {

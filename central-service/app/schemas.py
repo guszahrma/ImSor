@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from pydantic import BaseModel
 
 
@@ -58,6 +59,7 @@ class ImageCreate(BaseModel):
 
 class ImageOut(BaseModel):
     id: int
+    public_id: uuid.UUID
     file_path: str
     file_name: str
     file_size: int | None
@@ -101,6 +103,7 @@ class ClusterVoteSubmit(BaseModel):
 
 class ClusterImageOut(BaseModel):
     id: int
+    public_id: uuid.UUID
     file_path: str
     file_name: str
     file_size: int | None

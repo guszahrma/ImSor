@@ -165,6 +165,9 @@ def bbox_queue(
         img.id: img.date_taken.isoformat() if img.date_taken else None
         for img in eligible_images
     }
+    public_id_by_image: dict[int, str] = {
+        img.id: str(img.public_id) for img in eligible_images
+    }
     ai_anns = [ann for ann in ai_anns if ann.image_id in eligible_ids]
     if not ai_anns:
         return []
@@ -271,6 +274,7 @@ def bbox_queue(
             "named_count": any_count,
             "unnamed_count": total - any_count,
             "date_taken": date_taken_by_image.get(image_id),
+            "public_id":  public_id_by_image.get(image_id),
         })
 
     result.sort(key=lambda x: (x["tier"], -(avg_rating.get(x["image_id"]) or 0), -x["total_count"]))
@@ -540,6 +544,7 @@ def rating_queue(
             "rotation_correction": int(rot.value) if rot is not None else 0,
             "bookmark_annotation_id": bm.id if bm is not None else None,
             "date_taken": image.date_taken.isoformat() if image.date_taken else None,
+            "public_id": str(image.public_id),
         })
 
     # Unrated first, both groups randomized
@@ -636,6 +641,7 @@ def slideshow_queue(
                     "avg_rating": round(avg, 1),
                     "rating_count": len(vals),
                     "date_taken": image.date_taken.isoformat() if image.date_taken else None,
+                    "public_id":  str(image.public_id),
                     "latitude":   image.gps_latitude,
                     "longitude":  image.gps_longitude,
                 })

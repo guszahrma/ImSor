@@ -359,6 +359,7 @@
     }).catch(() => {});
 
     // ── State ──────────────────────────────────────────────────────────────
+    let _pendingUrlId = new URLSearchParams(location.search).get('id');
     let fullQueue = [];   // all images from server (unfiltered client-side)
     let queue = [];       // current filtered view
     let currentIndex = 0;
@@ -512,7 +513,20 @@
             return;
         }
         currentIndex = 0;
-        applyFilters(true);
+        let deepLinkUuid = null;
+        if (_pendingUrlId) {
+            const t = fullQueue.find(item => item.public_id === _pendingUrlId);
+            if (t) {
+                if (!passesDateFilter(t.date_taken, document.getElementById('date-from').value, document.getElementById('date-to').value)) {
+                    document.getElementById('date-from').value = '';
+                    document.getElementById('date-to').value = '';
+                    saveSettings();
+                }
+                deepLinkUuid = t.public_id;
+            }
+            _pendingUrlId = null;
+        }
+        applyFilters(true, deepLinkUuid);
     }
 
     function passesDateFilter(dateTaken, dateFrom, dateTo) {
@@ -524,7 +538,7 @@
         return true;
     }
 
-    function applyFilters(autoplay = false) {
+    function applyFilters(autoplay = false, targetUuid = null) {
         let filtered = fullQueue;
 
         // Date filter (client-side)
@@ -557,6 +571,11 @@
             });
         }
         queue = filtered;
+
+        if (targetUuid) {
+            const found = queue.findIndex(item => item.public_id === targetUuid);
+            if (found !== -1) currentIndex = found;
+        }
 
         if (queue.length === 0) {
             document.getElementById('main-layout').style.display = 'none';
@@ -821,6 +840,7 @@
     async function showImage(index) {
         currentIndex = index;
         const item = queue[index];
+        if (item?.public_id) history.replaceState(null, '', '?id=' + item.public_id);
         const imgEl = document.getElementById('main-img');
         resetZoom();
         imgEl.onload = function() {

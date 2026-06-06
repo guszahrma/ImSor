@@ -424,6 +424,7 @@
     const img       = document.getElementById('main-img');
 
     // ── State ──────────────────────────────────────────────────────────────
+    let _pendingUrlId = new URLSearchParams(location.search).get('id');
     let fullQueue = [];
     let queue = [];
     let completedIds = new Set();
@@ -511,7 +512,7 @@
         return true;
     }
 
-    function applyDateFilter() {
+    function applyDateFilter(targetImageId = null) {
         const dateFrom = document.getElementById('date-from').value;
         const dateTo   = document.getElementById('date-to').value;
         queue = fullQueue.filter(item =>
@@ -546,7 +547,12 @@
         document.getElementById('main-layout').style.display = 'block';
         document.getElementById('viewport').style.display = 'block';
         updateStatus();
-        showImage(0);
+        let startIdx = 0;
+        if (targetImageId !== null) {
+            const found = queue.findIndex(item => item.image_id === targetImageId);
+            if (found !== -1) startIdx = found;
+        }
+        showImage(startIdx);
     }
 
     const ANNOTATIONS_SETTINGS_KEY = 'imsor-annotations-settings';
@@ -605,7 +611,20 @@
             document.getElementById('loading').textContent = 'Error loading: ' + err.message;
             return;
         }
-        applyDateFilter();
+        let targetId = null;
+        if (_pendingUrlId) {
+            const t = fullQueue.find(item => item.public_id === _pendingUrlId);
+            if (t) {
+                if (!passesDateFilter(t.date_taken, document.getElementById('date-from').value, document.getElementById('date-to').value)) {
+                    document.getElementById('date-from').value = '';
+                    document.getElementById('date-to').value = '';
+                    saveSettings();
+                }
+                targetId = t.image_id;
+            }
+            _pendingUrlId = null;
+        }
+        applyDateFilter(targetId);
     }
 
     // ── Display ────────────────────────────────────────────────────────────
@@ -624,6 +643,7 @@
         updateStatus();
 
         const item = queue[index];
+        if (item?.public_id) history.replaceState(null, '', '?id=' + item.public_id);
         let data;
         try {
             data = await fetchImageData(item.image_id);
