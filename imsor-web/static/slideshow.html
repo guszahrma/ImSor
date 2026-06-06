@@ -107,37 +107,66 @@
         .setting-row input[type="range"] { width: 100%; }
         #timer-display { font-size: 0.85rem; color: #aaa; }
 
-        /* ── Age range slider ────────────────────────────────────────────── */
-        #age-filter-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        #age-filter-row input[type="checkbox"] { accent-color: #6a6aaa; width: 14px; height: 14px; }
-        #age-slider-wrap {
+        /* ── Year range slider ───────────────────────────────────────────── */
+        #year-filter-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        #year-filter-row input[type="checkbox"] { accent-color: #6a6aaa; width: 14px; height: 14px; }
+        #year-slider-wrap {
             margin-top: 6px; position: relative; height: 20px;
             transition: opacity 0.2s;
         }
-        #age-slider-wrap.disabled { opacity: 0.35; pointer-events: none; }
-        .age-track {
+        #year-slider-wrap.disabled { opacity: 0.35; pointer-events: none; }
+        .year-track {
             position: absolute; top: 8px; left: 0; right: 0;
             height: 4px; border-radius: 2px; background: #333;
         }
-        #age-range-fill {
+        #year-range-fill {
             position: absolute; height: 100%; background: #6a6aaa; border-radius: 2px;
         }
-        #age-slider-wrap input[type="range"] {
+        #year-slider-wrap input[type="range"] {
             position: absolute; width: 100%; top: 0;
             -webkit-appearance: none; appearance: none;
             background: transparent; pointer-events: none;
             margin: 0; padding: 0; height: 20px;
         }
-        #age-slider-wrap input[type="range"]::-webkit-slider-thumb {
+        #year-slider-wrap input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none;
             pointer-events: all; width: 14px; height: 14px;
             border-radius: 50%; background: #8888cc;
             border: 2px solid #aaaaee; cursor: pointer;
         }
-        #age-slider-wrap input[type="range"]::-moz-range-thumb {
+        #year-slider-wrap input[type="range"]::-moz-range-thumb {
             pointer-events: all; width: 14px; height: 14px;
             border-radius: 50%; background: #8888cc;
             border: 2px solid #aaaaee; cursor: pointer; box-sizing: border-box;
+        }
+
+        /* ── Focus persons ───────────────────────────────────────────────── */
+        #focus-persons-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+        .focus-person-row {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.82rem; color: #ccc;
+        }
+        .focus-person-row .person-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .focus-person-row .mode-btn {
+            padding: 2px 6px; font-size: 0.75rem; font-weight: 600;
+            border: none; border-radius: 3px; cursor: pointer; flex-shrink: 0;
+        }
+        .focus-person-row .mode-btn.and { background: #4a6a9a; color: #cce; }
+        .focus-person-row .mode-btn.or  { background: #7a5a2a; color: #fda; }
+        .focus-person-row .check-label {
+            display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+            font-size: 0.75rem; color: #999; cursor: pointer;
+        }
+        .focus-person-row .check-label input[type="checkbox"] { accent-color: #6a6aaa; }
+        .focus-person-row .check-label.disabled { opacity: 0.35; pointer-events: none; }
+        .focus-person-row .remove-btn {
+            background: none; border: none; color: #666;
+            font-size: 1rem; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0;
+        }
+        .focus-person-row .remove-btn:hover { color: #f66; }
+        #focus-add-wrap select {
+            width: 100%; padding: 4px 6px; font-size: 0.82rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px; color: #e0e0e0;
         }
 
         #btn-apply-filter {
@@ -150,18 +179,18 @@
         /* ── Zoom transition ─────────────────────────────────────────────── */
         #main-img { transform-origin: 0 0; }
 
-        /* ── Age display ─────────────────────────────────────────────────── */
+        /* ── Age display overlay ─────────────────────────────────────────── */
         #age-display {
             position: fixed; left: 0; top: 46px; bottom: 0;
             display: flex; align-items: center; justify-content: center;
             pointer-events: none; z-index: 10; overflow: hidden;
         }
         #age-display span {
-            font-size: 60px; font-weight: 500;
+            font-size: 48px; font-weight: 500;
             color: rgba(180, 180, 220, 0.65);
             text-align: center;
             white-space: pre-line;
-            line-height: 1.1;
+            line-height: 1.2;
         }
 
         /* ── Loading / done ──────────────────────────────────────────────── */
@@ -232,33 +261,40 @@
             <label for="min-raters">Minimum raters: <span id="raters-display">2</span></label>
             <input type="range" id="min-raters" min="1" max="10" step="1" value="2">
         </div>
-        <button id="btn-apply-filter">Apply &amp; reload</button>
 
-        <div class="setting-row" id="age-filter-row" style="margin-top: 1.4em;">
+        <div class="setting-row" id="year-filter-row" style="margin-top: 0.8em;">
             <label>
-                <input type="checkbox" id="age-filter-enabled">
-                Selma's age: <span id="age-range-display">0 – 18</span>
+                <input type="checkbox" id="year-filter-enabled">
+                Year: <span id="year-range-display"></span>
             </label>
-            <div id="age-slider-wrap" class="disabled">
-                <div class="age-track"><div id="age-range-fill"></div></div>
-                <input type="range" id="age-min" min="0" max="18" step="0.5" value="0">
-                <input type="range" id="age-max" min="0" max="18" step="0.5" value="18">
+            <div id="year-slider-wrap" class="disabled">
+                <div class="year-track"><div id="year-range-fill"></div></div>
+                <input type="range" id="year-min">
+                <input type="range" id="year-max">
             </div>
         </div>
+
+        <div style="margin-top: 1.4em;">
+            <label style="font-size:0.78rem; color:#777; text-transform:uppercase; letter-spacing:0.08em;">Focus persons</label>
+            <div id="focus-persons-list" style="margin-top: 0.6em;"></div>
+            <div id="focus-add-wrap" style="margin-top: 4px;">
+                <select id="focus-add-select">
+                    <option value="">— add person —</option>
+                </select>
+            </div>
+        </div>
+
+        <button id="btn-apply-filter" style="margin-top: 1.4em;">Apply &amp; reload</button>
 
         <div class="setting-row" id="zoom-row" style="margin-top: 1.4em;">
             <label>
                 <input type="checkbox" id="zoom-enabled">
-                Zoom on Selma
+                Zoom (any focus person)
             </label>
             <div id="zoom-controls" style="margin-top:6px; display:flex; flex-direction:column; gap:6px; opacity:0.35; pointer-events:none; transition:opacity 0.2s;">
                 <label style="font-size:0.82rem; color:#aaa;">
                     Margin: <span id="zoom-margin-display">30</span>%
                     <input type="range" id="zoom-margin" min="0" max="80" step="5" value="30" style="width:100%; margin-top:3px;">
-                </label>
-                <label style="font-size:0.82rem; color:#aaa; display:flex; align-items:center; gap:6px; cursor:pointer;">
-                    <input type="checkbox" id="zoom-selma-only">
-                    Only images where Selma has a bbox
                 </label>
             </div>
         </div>
@@ -331,12 +367,31 @@
     }).catch(() => {});
 
     // ── State ──────────────────────────────────────────────────────────────
-    let fullQueue = [];   // all images from server (unfiltered)
-    let queue = [];       // current filtered view — all existing code uses this
+    let fullQueue = [];   // all images from server (unfiltered client-side)
+    let queue = [];       // current filtered view
     let currentIndex = 0;
     let isPlaying = false;
     let timerHandle = null;
     const imageCache = new Map();
+
+    // Focus persons: [{id, name, birthdate, mode, zoom, age}]
+    let focusPersons = [];
+    // All persons from server: [{id, name, birthdate}]
+    let allPersons = [];
+
+    // ── Year slider setup ──────────────────────────────────────────────────
+    const CURRENT_YEAR = new Date().getFullYear();
+    const YEAR_MIN_BOUND = CURRENT_YEAR - 100;
+    const YEAR_MAX_BOUND = CURRENT_YEAR;
+
+    (function initYearSlider() {
+        const minEl = document.getElementById('year-min');
+        const maxEl = document.getElementById('year-max');
+        minEl.min = YEAR_MIN_BOUND; minEl.max = YEAR_MAX_BOUND; minEl.step = 1;
+        maxEl.min = YEAR_MIN_BOUND; maxEl.max = YEAR_MAX_BOUND; maxEl.step = 1;
+        minEl.value = YEAR_MIN_BOUND;
+        maxEl.value = YEAR_MAX_BOUND;
+    })();
 
     // ── Help panel ─────────────────────────────────────────────────────────
     function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
@@ -357,13 +412,13 @@
         document.getElementById('timer-interval').value = saved.timerInterval;
         document.getElementById('timer-display').textContent = saved.timerInterval + 's';
     }
-    if (saved.ageFilterEnabled) {
-        document.getElementById('age-filter-enabled').checked = true;
-        document.getElementById('age-slider-wrap').classList.remove('disabled');
+    if (saved.yearFilterEnabled) {
+        document.getElementById('year-filter-enabled').checked = true;
+        document.getElementById('year-slider-wrap').classList.remove('disabled');
     }
-    if (saved.ageMin !== undefined) document.getElementById('age-min').value = saved.ageMin;
-    if (saved.ageMax !== undefined) document.getElementById('age-max').value = saved.ageMax;
-    updateAgeSliderDisplay();
+    if (saved.yearMin !== undefined) document.getElementById('year-min').value = saved.yearMin;
+    if (saved.yearMax !== undefined) document.getElementById('year-max').value = saved.yearMax;
+    updateYearSliderDisplay();
     if (saved.zoomEnabled) {
         document.getElementById('zoom-enabled').checked = true;
         document.getElementById('zoom-controls').style.opacity = '1';
@@ -373,7 +428,6 @@
         document.getElementById('zoom-margin').value = saved.zoomMargin;
         document.getElementById('zoom-margin-display').textContent = saved.zoomMargin;
     }
-    if (saved.zoomSelmaOnly) document.getElementById('zoom-selma-only').checked = true;
     if (saved.locationEnabled) {
         document.getElementById('location-enabled').checked = true;
         document.getElementById('location-controls').style.opacity      = '1';
@@ -385,21 +439,22 @@
         document.getElementById('globe-zoom').value = (gz >= 0 && gz <= 100) ? gz : 0;
         document.getElementById('globe-zoom-display').textContent = globeZoomLabel();
     }
+    // focusPersons restored after persons list is loaded
 
     function saveSettings() {
         localStorage.setItem('slideshow-settings', JSON.stringify({
             minRating:        document.getElementById('min-rating').value,
             minRaters:        document.getElementById('min-raters').value,
             timerInterval:    document.getElementById('timer-interval').value,
-            ageFilterEnabled: document.getElementById('age-filter-enabled').checked,
-            ageMin:           document.getElementById('age-min').value,
-            ageMax:           document.getElementById('age-max').value,
+            yearFilterEnabled: document.getElementById('year-filter-enabled').checked,
+            yearMin:          document.getElementById('year-min').value,
+            yearMax:          document.getElementById('year-max').value,
             zoomEnabled:      document.getElementById('zoom-enabled').checked,
             zoomMargin:       document.getElementById('zoom-margin').value,
-            zoomSelmaOnly:    document.getElementById('zoom-selma-only').checked,
             locationEnabled:  document.getElementById('location-enabled').checked,
             locationOnly:     document.getElementById('location-only').checked,
             globeZoom:        document.getElementById('globe-zoom').value,
+            focusPersons:     focusPersons,
         }));
     }
 
@@ -443,7 +498,7 @@
     function scheduleNext() {
         if (!isPlaying) return;
         const raw = parseInt(document.getElementById('timer-interval').value);
-        const zoomOn = document.getElementById('zoom-enabled').checked;
+        const zoomOn = document.getElementById('zoom-enabled').checked && focusPersons.some(p => p.zoom);
         const interval = (zoomOn ? Math.max(raw, 10) : raw) * 1000;
         timerHandle = setTimeout(() => {
             if (isPlaying) {
@@ -461,10 +516,18 @@
     async function loadData() {
         stopAutoplay();
         closeHelp();
-        const minRating = parseFloat(document.getElementById('min-rating').value);
-        const minRaters = parseInt(document.getElementById('min-raters').value);
+        const minRating   = parseFloat(document.getElementById('min-rating').value);
+        const minRaters   = parseInt(document.getElementById('min-raters').value);
+        const andIds = focusPersons.filter(p => p.mode === 'and').map(p => p.id).join(',');
+        const orIds  = focusPersons.filter(p => p.mode === 'or').map(p => p.id).join(',');
+        const params = new URLSearchParams({
+            min_rating: minRating,
+            min_raters: minRaters,
+            and_person_ids: andIds,
+            or_person_ids: orIds,
+        });
         try {
-            const resp = await fetch(`/api/slideshow-queue?min_rating=${minRating}&min_raters=${minRaters}`);
+            const resp = await fetch(`/api/slideshow-queue?${params}`);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             fullQueue = await resp.json();
         } catch (err) {
@@ -476,45 +539,32 @@
         applyFilters(true);
     }
 
-    function computeAgeDecimal(birthdate, dateTaken) {
-        if (!birthdate || !dateTaken) return null;
-        const birth = new Date(birthdate);
-        const taken = new Date(dateTaken);
-        if (taken < birth) return null;
-        return (taken - birth) / (365.25 * 24 * 60 * 60 * 1000);
-    }
-
-    function updateAgeSliderDisplay() {
-        const min = parseFloat(document.getElementById('age-min').value);
-        const max = parseFloat(document.getElementById('age-max').value);
-        const sliderMax = 18;
-        const leftPct  = (min / sliderMax) * 100;
-        const rightPct = (max / sliderMax) * 100;
-        document.getElementById('age-range-fill').style.left  = leftPct + '%';
-        document.getElementById('age-range-fill').style.width = (rightPct - leftPct) + '%';
-        document.getElementById('age-range-display').textContent =
+    // ── Year filter ────────────────────────────────────────────────────────
+    function updateYearSliderDisplay() {
+        const min = parseInt(document.getElementById('year-min').value);
+        const max = parseInt(document.getElementById('year-max').value);
+        const span = YEAR_MAX_BOUND - YEAR_MIN_BOUND;
+        const leftPct  = ((min - YEAR_MIN_BOUND) / span) * 100;
+        const rightPct = ((max - YEAR_MIN_BOUND) / span) * 100;
+        document.getElementById('year-range-fill').style.left  = leftPct + '%';
+        document.getElementById('year-range-fill').style.width = (rightPct - leftPct) + '%';
+        document.getElementById('year-range-display').textContent =
             min === max ? `${min}` : `${min} – ${max}`;
     }
 
     function applyFilters(autoplay = false) {
         let filtered = fullQueue;
 
-        // Age filter
-        const ageEnabled = document.getElementById('age-filter-enabled').checked;
-        if (ageEnabled && selmaBirthdate) {
-            const minAge = parseFloat(document.getElementById('age-min').value);
-            const maxAge = parseFloat(document.getElementById('age-max').value);
+        // Year filter (client-side)
+        const yearEnabled = document.getElementById('year-filter-enabled').checked;
+        if (yearEnabled) {
+            const minYear = parseInt(document.getElementById('year-min').value);
+            const maxYear = parseInt(document.getElementById('year-max').value);
             filtered = filtered.filter(item => {
-                const age = computeAgeDecimal(selmaBirthdate, item.date_taken);
-                return age !== null && age >= minAge && age <= maxAge;
+                if (!item.date_taken) return false;
+                const y = new Date(item.date_taken).getFullYear();
+                return y >= minYear && y <= maxYear;
             });
-        }
-
-        // Selma-only filter
-        const zoomEnabled = document.getElementById('zoom-enabled').checked;
-        const selmaOnly   = document.getElementById('zoom-selma-only').checked;
-        if (zoomEnabled && selmaOnly) {
-            filtered = filtered.filter(item => item.selma_bbox != null);
         }
 
         // Location-only filter
@@ -540,23 +590,23 @@
         if (autoplay) startAutoplay();
     }
 
-    // Age filter controls
-    document.getElementById('age-filter-enabled').addEventListener('change', function () {
-        document.getElementById('age-slider-wrap').classList.toggle('disabled', !this.checked);
+    // Year filter controls
+    document.getElementById('year-filter-enabled').addEventListener('change', function () {
+        document.getElementById('year-slider-wrap').classList.toggle('disabled', !this.checked);
         applyFilters(); saveSettings();
     });
-    document.getElementById('age-min').addEventListener('input', function () {
-        const max = parseFloat(document.getElementById('age-max').value);
-        if (parseFloat(this.value) > max) this.value = max;
-        updateAgeSliderDisplay();
-        if (document.getElementById('age-filter-enabled').checked) applyFilters();
+    document.getElementById('year-min').addEventListener('input', function () {
+        const max = parseInt(document.getElementById('year-max').value);
+        if (parseInt(this.value) > max) this.value = max;
+        updateYearSliderDisplay();
+        if (document.getElementById('year-filter-enabled').checked) applyFilters();
         saveSettings();
     });
-    document.getElementById('age-max').addEventListener('input', function () {
-        const min = parseFloat(document.getElementById('age-min').value);
-        if (parseFloat(this.value) < min) this.value = min;
-        updateAgeSliderDisplay();
-        if (document.getElementById('age-filter-enabled').checked) applyFilters();
+    document.getElementById('year-max').addEventListener('input', function () {
+        const min = parseInt(document.getElementById('year-min').value);
+        if (parseInt(this.value) < min) this.value = min;
+        updateYearSliderDisplay();
+        if (document.getElementById('year-filter-enabled').checked) applyFilters();
         saveSettings();
     });
 
@@ -565,15 +615,121 @@
         const on = this.checked;
         document.getElementById('zoom-controls').style.opacity      = on ? '1' : '0.35';
         document.getElementById('zoom-controls').style.pointerEvents = on ? '' : 'none';
-        applyFilters(); saveSettings();
+        saveSettings();
     });
     document.getElementById('zoom-margin').addEventListener('input', function () {
         document.getElementById('zoom-margin-display').textContent = this.value;
         saveSettings();
     });
-    document.getElementById('zoom-selma-only').addEventListener('change', function () {
-        applyFilters(); saveSettings();
+
+    // ── Focus persons UI ───────────────────────────────────────────────────
+    function renderFocusPersons() {
+        const list = document.getElementById('focus-persons-list');
+        list.innerHTML = '';
+        focusPersons.forEach((p, idx) => {
+            const row = document.createElement('div');
+            row.className = 'focus-person-row';
+
+            const modeBtn = document.createElement('button');
+            modeBtn.className = 'mode-btn ' + p.mode;
+            modeBtn.textContent = p.mode.toUpperCase();
+            modeBtn.title = 'Toggle AND / OR';
+            modeBtn.addEventListener('click', () => {
+                focusPersons[idx].mode = p.mode === 'and' ? 'or' : 'and';
+                saveSettings();
+                renderFocusPersons();
+            });
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'person-name';
+            nameSpan.textContent = p.name;
+            nameSpan.title = p.name;
+
+            const zoomLabel = document.createElement('label');
+            zoomLabel.className = 'check-label';
+            const zoomCb = document.createElement('input');
+            zoomCb.type = 'checkbox'; zoomCb.checked = p.zoom;
+            zoomCb.addEventListener('change', () => {
+                focusPersons[idx].zoom = zoomCb.checked;
+                saveSettings();
+            });
+            zoomLabel.appendChild(zoomCb);
+            zoomLabel.append('zoom');
+
+            const ageLabel = document.createElement('label');
+            const hasBirthdate = !!p.birthdate;
+            ageLabel.className = 'check-label' + (hasBirthdate ? '' : ' disabled');
+            const ageCb = document.createElement('input');
+            ageCb.type = 'checkbox'; ageCb.checked = p.age && hasBirthdate;
+            ageCb.disabled = !hasBirthdate;
+            ageCb.title = hasBirthdate ? '' : 'No birthdate recorded';
+            ageCb.addEventListener('change', () => {
+                focusPersons[idx].age = ageCb.checked;
+                saveSettings();
+                updateAgeDisplay(queue[currentIndex]);
+            });
+            ageLabel.appendChild(ageCb);
+            ageLabel.append('age');
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.title = 'Remove';
+            removeBtn.addEventListener('click', () => {
+                focusPersons.splice(idx, 1);
+                saveSettings();
+                renderFocusPersons();
+                updateAddDropdown();
+            });
+
+            row.append(modeBtn, nameSpan, zoomLabel, ageLabel, removeBtn);
+            list.appendChild(row);
+        });
+
+        updateAddDropdown();
+    }
+
+    function updateAddDropdown() {
+        const sel = document.getElementById('focus-add-select');
+        const usedIds = new Set(focusPersons.map(p => p.id));
+        sel.innerHTML = '<option value="">— add person —</option>';
+        allPersons.forEach(p => {
+            if (usedIds.has(p.id)) return;
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    document.getElementById('focus-add-select').addEventListener('change', function () {
+        const id = parseInt(this.value);
+        if (!id) return;
+        const person = allPersons.find(p => p.id === id);
+        if (!person) return;
+        focusPersons.push({ id: person.id, name: person.name, birthdate: person.birthdate, mode: 'and', zoom: false, age: false });
+        saveSettings();
+        renderFocusPersons();
+        this.value = '';
     });
+
+    // ── Persons list ───────────────────────────────────────────────────────
+    async function loadPersons() {
+        try {
+            const resp = await fetch('/api/admin/persons');
+            if (!resp.ok) return;
+            allPersons = await resp.json();
+            // Restore saved focus persons (match by id, refresh name/birthdate from server)
+            if (saved.focusPersons && Array.isArray(saved.focusPersons)) {
+                focusPersons = saved.focusPersons.flatMap(sp => {
+                    const live = allPersons.find(p => p.id === sp.id);
+                    if (!live) return [];
+                    return [{ ...sp, name: live.name, birthdate: live.birthdate }];
+                });
+            }
+            renderFocusPersons();
+        } catch (_) {}
+    }
 
     // ── Zoom animation ─────────────────────────────────────────────────────
     let zoomHandle = null;
@@ -583,6 +739,17 @@
         const imgEl = document.getElementById('main-img');
         imgEl.style.transition = 'none';
         imgEl.style.transform  = '';
+    }
+
+    function unionBbox(bboxes) {
+        // Compute bounding box that encloses all given bboxes
+        const valid = bboxes.filter(Boolean);
+        if (!valid.length) return null;
+        const x1 = Math.min(...valid.map(b => b.x));
+        const y1 = Math.min(...valid.map(b => b.y));
+        const x2 = Math.max(...valid.map(b => b.x + b.width));
+        const y2 = Math.max(...valid.map(b => b.y + b.height));
+        return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
     }
 
     function startZoom(bbox) {
@@ -605,7 +772,6 @@
             const targetH = bbox.height * scaleY * (1 + 2 * margin);
             const Z = Math.min(areaRect.width / targetW, areaRect.height / targetH);
 
-            // pan so bbox centre lands at area centre (transform-origin: 0 0)
             const imgX = imgRect.left - areaRect.left;
             const imgY = imgRect.top  - areaRect.top;
             const panX = areaRect.width  / 2 - imgX - (bbox.x + bbox.width  / 2) * scaleX * Z;
@@ -645,14 +811,20 @@
         imgEl.onload = function() {
             const rect = imgEl.getBoundingClientRect();
             document.getElementById('age-display').style.width = Math.max(0, rect.left) + 'px';
-            if (document.getElementById('zoom-enabled').checked && item.selma_bbox) {
-                startZoom(item.selma_bbox);
+
+            // Zoom: union bbox of all focus persons with zoom=true that have a bbox
+            if (document.getElementById('zoom-enabled').checked) {
+                const zoomBboxes = focusPersons
+                    .filter(p => p.zoom)
+                    .map(p => item.person_bboxes?.[String(p.id)] ?? null);
+                const union = unionBbox(zoomBboxes);
+                if (union) startZoom(union);
             }
         };
         imgEl.src = `/serve/${item.image_id}`;
         updateStatus();
         prefetchNext();
-        updateAgeDisplay(item.date_taken);
+        updateAgeDisplay(item);
         if (document.getElementById('location-enabled').checked) {
             if (item.latitude != null && item.longitude != null) {
                 showGlobeAt(item.longitude, item.latitude);
@@ -660,6 +832,37 @@
                 document.getElementById('globe-overlay').style.display = 'none';
             }
         }
+    }
+
+    // ── Age display ────────────────────────────────────────────────────────
+    function computeAge(birthdate, dateTaken) {
+        if (!birthdate || !dateTaken) return null;
+        const birth = new Date(birthdate);
+        const taken = new Date(dateTaken);
+        if (taken < birth) return null;
+        let years  = taken.getFullYear() - birth.getFullYear();
+        let months = taken.getMonth()    - birth.getMonth();
+        let days   = taken.getDate()     - birth.getDate();
+        if (days < 0) {
+            months--;
+            days += new Date(taken.getFullYear(), taken.getMonth(), 0).getDate();
+        }
+        if (months < 0) { years--; months += 12; }
+        if (years < 3)  return `${years}y ${months}m ${days}d`;
+        if (years < 10) return `${years}y ${months}m`;
+        return `${years}y`;
+    }
+
+    function updateAgeDisplay(item) {
+        const bboxes = item?.person_bboxes ?? {};
+        const lines = focusPersons
+            .filter(p => p.age && p.birthdate && bboxes[String(p.id)] != null)
+            .map(p => {
+                const age = computeAge(p.birthdate, item?.date_taken);
+                return age ? `${p.name.split(' ')[0]}: ${age}` : null;
+            })
+            .filter(Boolean);
+        document.getElementById('age-text').textContent = lines.join('\n');
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -677,52 +880,13 @@
 
     // ── Keyboard ───────────────────────────────────────────────────────────
     document.addEventListener('keydown', e => {
-        if (e.target.tagName === 'INPUT') return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
         if (e.key === 'ArrowLeft')  { navigate(-1); return; }
         if (e.key === 'ArrowRight') { navigate(1);  return; }
         if (e.key === 'Escape')     { closeHelp(); return; }
         if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
         if (e.key === ' ') { e.preventDefault(); isPlaying ? stopAutoplay() : startAutoplay(); }
     });
-
-    // ── Age display ────────────────────────────────────────────────────────
-    let selmaBirthdate = null;
-
-    function computeAge(birthdate, dateTaken) {
-        if (!birthdate || !dateTaken) return null;
-        const birth = new Date(birthdate);
-        const taken = new Date(dateTaken);
-        if (taken < birth) return null;
-        let years  = taken.getFullYear() - birth.getFullYear();
-        let months = taken.getMonth()    - birth.getMonth();
-        let days   = taken.getDate()     - birth.getDate();
-        if (days < 0) {
-            months--;
-            days += new Date(taken.getFullYear(), taken.getMonth(), 0).getDate();
-        }
-        if (months < 0) { years--; months += 12; }
-        if (years < 3)  return `${years} y\n${months} m\n${days} d`;
-        if (years < 10) return `${years} y\n${months} m`;
-        return `${years} y`;
-    }
-
-    function updateAgeDisplay(dateTaken) {
-        document.getElementById('age-text').textContent =
-            computeAge(selmaBirthdate, dateTaken) ?? '';
-    }
-
-    async function loadSelmasBirthdate() {
-        try {
-            const resp = await fetch('/api/admin/persons');
-            if (!resp.ok) return;
-            const persons = await resp.json();
-            const selma = persons.find(p => p.name === 'Selma Zahr');
-            if (selma) {
-                selmaBirthdate = selma.birthdate;
-                if (document.getElementById('age-filter-enabled').checked) applyFilters();
-            }
-        } catch (_) {}
-    }
 
     // ── Location controls ──────────────────────────────────────────────────
     document.getElementById('location-enabled').addEventListener('change', function () {
@@ -743,7 +907,6 @@
     });
 
     function globeAltitude() {
-        // slider 0 → altitude 2.0 (full earth), slider 100 → altitude 0.02 (close up)
         const t = parseFloat(document.getElementById('globe-zoom').value) / 100;
         return 2.0 * Math.pow(0.01, t);
     }
@@ -796,9 +959,8 @@
     }
 
     // ── Boot ───────────────────────────────────────────────────────────────
-    loadSelmasBirthdate();
     if (document.getElementById('location-enabled').checked) initGlobe();
-    loadData();
+    loadPersons().then(() => loadData());
     </script>
 </body>
 </html>

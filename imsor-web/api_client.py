@@ -131,10 +131,22 @@ def get_rating_queue(user_id: int) -> list[dict]:
                     params={"user_id": user_id}).json()
 
 
-def get_slideshow_queue(user_id: int, min_rating: float = 7.0, min_raters: int = 1) -> list[dict]:
+def get_slideshow_queue(
+    user_id: int,
+    min_rating: float = 7.0,
+    min_raters: int = 1,
+    and_person_ids: str = "",
+    or_person_ids: str = "",
+) -> list[dict]:
     """Return images accessible to the user with community average rating, filtered by min_rating."""
     return _request("GET", f"{config.server_url}/annotations/slideshow-queue",
-                    params={"user_id": user_id, "min_rating": min_rating, "min_raters": min_raters}).json()
+                    params={
+                        "user_id": user_id,
+                        "min_rating": min_rating,
+                        "min_raters": min_raters,
+                        "and_person_ids": and_person_ids,
+                        "or_person_ids": or_person_ids,
+                    }).json()
 
 def get_all_users() -> list[dict]:
     return _request("GET", f"{config.server_url}/users/").json()
@@ -175,6 +187,10 @@ def create_person_link(person_name: str, user_id: int) -> dict:
 
 def delete_person_link(link_id: int) -> dict:
     return _request("DELETE", f"{config.server_url}/admin/person-links/{link_id}").json()
+
+def update_person_birthdate(person_id: int, birthdate: str | None) -> dict:
+    return _request("PATCH", f"{config.server_url}/admin/persons/{person_id}",
+                    json={"birthdate": birthdate}).json()
 
 def set_can_create_community(user_id: int, value: bool) -> dict:
     return _request("PATCH", f"{config.server_url}/admin/users/{user_id}/can-create-community",

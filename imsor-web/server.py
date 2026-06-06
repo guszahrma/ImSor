@@ -211,6 +211,15 @@ def api_get_persons():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/admin/persons/<int:person_id>", methods=["PATCH"])
+def api_patch_person(person_id):
+    user = session.get("user")
+    if not user or user.get("role") != "superuser":
+        return jsonify({"error": "forbidden"}), 403
+    body = request.get_json()
+    return jsonify(api_client.update_person_birthdate(person_id, body.get("birthdate")))
+
+
 @app.route("/api/admin/person-links", methods=["GET"])
 def api_get_person_links():
     user = session.get("user")
@@ -522,10 +531,14 @@ def api_slideshow_queue():
     user = session.get("user")
     if not user:
         return jsonify({"error": "unauthorized"}), 401
-    min_rating = request.args.get("min_rating", 7.0, type=float)
-    min_raters = request.args.get("min_raters", 1, type=int)
+    min_rating      = request.args.get("min_rating", 7.0, type=float)
+    min_raters      = request.args.get("min_raters", 1, type=int)
+    and_person_ids  = request.args.get("and_person_ids", "", type=str)
+    or_person_ids   = request.args.get("or_person_ids", "", type=str)
     try:
-        queue = api_client.get_slideshow_queue(user["id"], min_rating, min_raters)
+        queue = api_client.get_slideshow_queue(
+            user["id"], min_rating, min_raters, and_person_ids, or_person_ids
+        )
         return jsonify(queue)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

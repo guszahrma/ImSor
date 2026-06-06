@@ -543,11 +543,18 @@ def slideshow_queue(
     user_id: int,
     min_rating: float = Query(7.0),
     min_raters: int = Query(1),
+    and_person_ids: str = Query(""),
+    or_person_ids: str = Query(""),
     db: Session = Depends(get_db),
     _current: User = Depends(get_current_user),
 ):
     """Return images accessible to the user with community average slideshow_rating,
-    filtered by minimum average rating. Shuffled order. Excludes duplicate copies."""
+    filtered by minimum average rating and optionally by focus persons. Shuffled order.
+    Excludes duplicate copies and vetoed images."""
+    and_ids = [int(x) for x in and_person_ids.split(",") if x.strip().isdigit()]
+    or_ids  = [int(x) for x in or_person_ids.split(",")  if x.strip().isdigit()]
+    focus_ids = list(set(and_ids + or_ids))
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -624,53 +631,63 @@ def slideshow_queue(
     # Shuffle for variety
     random.shuffle(result)
 
-    # Attach Selma's largest bbox per image
-    selma = db.query(Person).filter(Person.name == "Selma Zahr").first()
-    if selma and result:
+    # Attach focus person bboxes and apply AND/OR person filter
+    if focus_ids and result:
         image_ids = {item["image_id"] for item in result}
 
-        # Gather all person_bbox annotations (adoptions + AI) for these images
+        # Gather all person_bbox annotations for these images
         all_bboxes = db.query(Annotation).filter(
             Annotation.image_id.in_(image_ids),
             Annotation.annotation_type == "person_bbox",
         ).all()
         bbox_ids = [a.id for a in all_bboxes]
+        ann_by_id = {a.id: a for a in all_bboxes}
 
-        # Find PersonIdentity rows linking to Selma
-        selma_ann_ids: set[int] = set()
+        # Build {person_id: {image_id: largest identified bbox}} via PersonIdentity
+        bbox_by_person: dict[int, dict[int, dict]] = {pid: {} for pid in focus_ids}
         if bbox_ids:
             for pi in db.query(PersonIdentity).filter(
                 PersonIdentity.bbox_annotation_id.in_(bbox_ids),
-                PersonIdentity.person_id == selma.id,
+                PersonIdentity.person_id.in_(focus_ids),
             ).all():
-                selma_ann_ids.add(pi.bbox_annotation_id)
+                if pi.person_id is None:
+                    continue
+                ann = ann_by_id.get(pi.bbox_annotation_id)
+                if ann is None:
+                    continue
+                try:
+                    val = json_mod.loads(ann.value)
+                    area = val.get("width", 0) * val.get("height", 0)
+                    existing = bbox_by_person[pi.person_id].get(ann.image_id)
+                    if existing is None or area > existing["_area"]:
+                        bbox_by_person[pi.person_id][ann.image_id] = {
+                            "x": val["x"], "y": val["y"],
+                            "width": val["width"], "height": val["height"],
+                            "_area": area,
+                        }
+                except (json_mod.JSONDecodeError, KeyError, TypeError):
+                    pass
 
-        # Pick the largest Selma bbox per image
-        selma_bbox_by_image: dict[int, dict] = {}
-        for ann in all_bboxes:
-            if ann.id not in selma_ann_ids:
-                continue
-            try:
-                val = json_mod.loads(ann.value)
-                area = val.get("width", 0) * val.get("height", 0)
-                existing = selma_bbox_by_image.get(ann.image_id)
-                if existing is None or area > existing["_area"]:
-                    selma_bbox_by_image[ann.image_id] = {
-                        "x": val["x"], "y": val["y"],
-                        "width": val["width"], "height": val["height"],
-                        "_area": area,
-                    }
-            except (json_mod.JSONDecodeError, KeyError, TypeError):
-                pass
-
+        # Filter by AND/OR logic and attach person_bboxes
+        filtered = []
         for item in result:
-            bbox = selma_bbox_by_image.get(item["image_id"])
-            item["selma_bbox"] = (
-                {k: bbox[k] for k in ("x", "y", "width", "height")} if bbox else None
-            )
+            iid = item["image_id"]
+            if any(iid not in bbox_by_person[pid] for pid in and_ids):
+                continue
+            if or_ids and not any(iid in bbox_by_person[pid] for pid in or_ids):
+                continue
+            item["person_bboxes"] = {
+                str(pid): (
+                    {k: bbox_by_person[pid][iid][k] for k in ("x", "y", "width", "height")}
+                    if iid in bbox_by_person[pid] else None
+                )
+                for pid in focus_ids
+            }
+            filtered.append(item)
+        result = filtered
     else:
         for item in result:
-            item["selma_bbox"] = None
+            item["person_bboxes"] = {}
 
     return result
 

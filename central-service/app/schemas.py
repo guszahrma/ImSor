@@ -191,6 +191,9 @@ class PersonCreate(BaseModel):
     user_id: int | None = None
     birthdate: datetime.date | None = None
 
+class PersonBirthdateUpdate(BaseModel):
+    birthdate: datetime.date | None
+
 class PersonOut(BaseModel):
     id: int
     name: str

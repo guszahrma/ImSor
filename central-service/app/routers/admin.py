@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..auth import require_role
 from ..database import get_db
 from ..models import User, Camera, Person, Annotation, Image
-from ..schemas import CameraCreate, CameraOut, PersonCreate, PersonOut, UserOut
+from ..schemas import CameraCreate, CameraOut, PersonBirthdateUpdate, PersonCreate, PersonOut, UserOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -126,6 +126,22 @@ def create_person_link(
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Person already exists")
+    return person
+
+
+@router.patch("/persons/{person_id}", response_model=PersonOut)
+def update_person_birthdate(
+    person_id: int,
+    data: PersonBirthdateUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role("superuser")),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    person.birthdate = data.birthdate
+    db.commit()
+    db.refresh(person)
     return person
 
 

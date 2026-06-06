@@ -18,6 +18,8 @@
     th, td { border: 1px solid #333; padding: 8px 12px; text-align: left; font-size: 0.95em; }
     th { background: #1e1e1e; color: #aaa; font-weight: normal; }
     td { background: #161616; }
+    #person-birthdates-table tbody tr:nth-child(odd)  td { background: #161616; }
+    #person-birthdates-table tbody tr:nth-child(even) td { background: #1e1e2e; }
 
     .add-row { display: flex; gap: 0.75em; align-items: center; flex-wrap: wrap; }
     .add-row select, .add-row input[type=text] {
@@ -75,6 +77,15 @@
   <div id="admin-content" class="hidden">
 
     <!-- ── Section 1: Person-name → User links ── -->
+    <section id="section-person-birthdates">
+      <h2>Person birthdates</h2>
+      <p style="font-size:0.85em;color:#888">Set the birthdate for each known person. Required for age display in the slideshow.</p>
+      <table id="person-birthdates-table">
+        <thead><tr><th>Person</th><th>Birthdate</th><th style="width:5em"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
     <section id="section-person-links">
       <h2>Person → User links</h2>
       <p style="font-size:0.85em;color:#888">Link an annotated person name to a User account, granting them annotated-user rights.</p>
@@ -133,6 +144,7 @@
   <script>
     let allUsers = [];
     let personNames = [];
+    let allPersons = [];
     let imageCameras = [];
     let cameras = [];
     let personLinks = [];
@@ -153,6 +165,40 @@
         throw new Error(j.error || j.detail || r.statusText);
       }
       return r.json();
+    }
+
+    // ── Person birthdates ──
+
+    function renderPersonBirthdates() {
+      const tbody = document.querySelector('#person-birthdates-table tbody');
+      tbody.innerHTML = '';
+      for (const p of allPersons) {
+        const tr = document.createElement('tr');
+        const dateVal = p.birthdate || '';
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td><input type="date" value="${dateVal}" data-person-id="${p.id}" style="background:#1a1a2e;border:1px solid #444;border-radius:4px;color:#e0e0e0;padding:3px 6px;font-size:0.85rem;"></td>
+          <td style="font-size:0.85rem;color:#777;" class="save-status"></td>`;
+        tbody.appendChild(tr);
+        tr.querySelector('input').addEventListener('change', function () {
+          savePersonBirthdate(p.id, this);
+        });
+      }
+    }
+
+    async function savePersonBirthdate(personId, input) {
+      const birthdate = input.value || null;
+      const statusCell = input.closest('tr').querySelector('.save-status');
+      try {
+        const updated = await api('PATCH', `/api/admin/persons/${personId}`, { birthdate });
+        const idx = allPersons.findIndex(p => p.id === personId);
+        if (idx !== -1) allPersons[idx].birthdate = updated.birthdate;
+        statusCell.textContent = '✓ Saved';
+        setTimeout(() => { statusCell.textContent = ''; }, 1500);
+      } catch (e) {
+        statusCell.textContent = '✗ Error';
+        alert('Failed to save: ' + e.message);
+      }
     }
 
     // ── Person links ──
@@ -433,9 +479,10 @@
       currentUserId = me.user.id;
       document.getElementById('admin-content').classList.remove('hidden');
 
-      [allUsers, personNames, imageCameras, cameras, personLinks, communities] = await Promise.all([
+      [allUsers, personNames, allPersons, imageCameras, cameras, personLinks, communities] = await Promise.all([
         api('GET', '/api/users'),
         api('GET', '/api/admin/person-names'),
+        api('GET', '/api/admin/persons'),
         api('GET', '/api/admin/image-cameras'),
         api('GET', '/api/admin/cameras'),
         api('GET', '/api/admin/person-links'),
@@ -445,6 +492,7 @@
       populateUserDropdowns();
       populatePersonNameSelect();
       populateCameraMakeModelSelect();
+      renderPersonBirthdates();
       renderPersonLinks();
       renderCameras();
       renderCommunities();
