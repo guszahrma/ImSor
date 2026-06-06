@@ -351,8 +351,8 @@
             }
         } else {
             clusters.sort((a, b) => {
-                const da = (a.images[0]?.date_taken || '').slice(0, 10);
-                const db = (b.images[0]?.date_taken || '').slice(0, 10);
+                const da = (a.images[0]?.date_taken || '').slice(0, 19);
+                const db = (b.images[0]?.date_taken || '').slice(0, 19);
                 return da < db ? -1 : da > db ? 1 : 0;
             });
         }

@@ -170,7 +170,13 @@ def list_clusters(
                         DuplicateRoleVote(image_id=img_id, value=val)
                     )
 
-        already_voted = user_id in cluster_user_ids
+        # Exclude only if the user has voted on every visible image in the cluster.
+        # A cluster that has grown since the user's last vote is re-surfaced so the
+        # new images can be voted on.
+        user_voted_visible = {
+            v.image_id for v in user_votes_for_cluster if v.image_id in set(visible_ids)
+        }
+        already_voted = user_voted_visible == set(visible_ids)
 
         if already_voted:
             continue  # exclude from queue
@@ -187,8 +193,8 @@ def list_clusters(
             cluster_id=min(image_ids),  # stable ID based on full cluster, not just visible slice
             images=cluster_images,
             annotator_count=annotator_count,
-            current_user_voted=False,
-            current_user_votes=[],
+            current_user_voted=len(user_votes_for_cluster) > 0,
+            current_user_votes=user_votes_for_cluster,
         ))
 
     # Sort: zero-annotation clusters first, then by fewest annotators,

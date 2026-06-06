@@ -530,8 +530,8 @@
         } else {
             queue.sort((a, b) => {
                 if ((a.tier || 0) !== (b.tier || 0)) return (a.tier || 0) - (b.tier || 0);
-                const da = (a.date_taken || '').slice(0, 10);
-                const db = (b.date_taken || '').slice(0, 10);
+                const da = (a.date_taken || '').slice(0, 19);
+                const db = (b.date_taken || '').slice(0, 19);
                 return da < db ? -1 : da > db ? 1 : 0;
             });
         }
