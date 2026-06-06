@@ -304,7 +304,8 @@
 
             <h3>Navigation</h3>
             <table><tbody>
-                <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next image</td></tr>
+                <tr><td><kbd>←</kbd></td><td>Back to previously visited image</td></tr>
+                <tr><td><kbd>→</kbd></td><td>Next image in queue</td></tr>
             </tbody></table>
 
             <h3>Zoom &amp; pan</h3>
@@ -997,6 +998,7 @@
         if (wasUnnamed) item.unnamed_count--;
         else item.named_count--;
         if (item.unnamed_count === 0 || currentAnnotations.length === 0) {
+            pushHistory();
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
             if (currentIndex >= queue.length) currentIndex--;
@@ -1033,6 +1035,7 @@
         const item = queue[currentIndex];
         if (wasUnnamed) { item.unnamed_count--; item.named_count++; }
         if (item.unnamed_count === 0) {
+            pushHistory();
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
             if (currentIndex >= queue.length) currentIndex--;
@@ -1064,9 +1067,35 @@
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
+    // visitHistory stores {imageId, queueItem} so we can go back even after an
+    // image is auto-removed from the queue on completion.
+    let visitHistory = [];
+
+    function pushHistory() {
+        if (!queue[currentIndex]) return;
+        visitHistory.push({ imageId: queue[currentIndex].image_id, queueItem: {...queue[currentIndex]} });
+        if (visitHistory.length > 100) visitHistory.shift();
+    }
 
     function navigate(delta) {
-        showImage((currentIndex + delta + queue.length) % queue.length);
+        if (delta < 0) {
+            goBack();
+        } else {
+            pushHistory();
+            showImage((currentIndex + delta + queue.length) % queue.length);
+        }
+    }
+
+    function goBack() {
+        if (visitHistory.length === 0) return;
+        const { imageId, queueItem } = visitHistory.pop();
+        let idx = queue.findIndex(item => item.image_id === imageId);
+        if (idx < 0) {
+            // Image was removed from queue after completion — re-insert so showImage works
+            idx = Math.min(currentIndex, queue.length);
+            queue.splice(idx, 0, { ...queueItem, image_id: imageId });
+        }
+        showImage(idx);
     }
 
     function panToBox(ann) {
