@@ -30,6 +30,8 @@
             border-bottom: 1px solid #2a2a4a;
             flex-shrink: 0;
         }
+        #topbar-counter { position: absolute; right: 50px; transition: right 0.25s ease; }
+        #topbar.panel-open #topbar-counter { right: 364px; }
         #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
         #site-nav { display: flex; gap: 14px; align-items: center; }
         #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
@@ -222,7 +224,7 @@
         /* ── Progress ────────────────────────────────────────────────────── */
         #progress {
             position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-            font-size: 0.8rem; color: #555; pointer-events: none;
+            font-size: 0.8rem; color: #ddd; pointer-events: none;
         }
     </style>
 </head>
@@ -233,18 +235,14 @@
         <span id="topbar-title">ImSor — Slideshow</span>
         <div id="site-nav">
             <a href="/">Home</a>
-            <a href="/annotations">Annotations</a>
             <a href="/duplicates">Duplicates</a>
+            <a href="/annotations">Annotations</a>
             <a href="/rate">Rate</a>
             <a href="/users" id="nav-users" style="display:none">Users</a>
             <a href="/admin" id="nav-admin" style="display:none">Admin</a>
-            <button id="btn-play" class="play-btn">Play</button>
-            <button id="btn-pause" class="play-btn" style="display:none;">Pause</button>
-            <span id="topbar-counter" style="font-size:0.85rem; color:#666; white-space:nowrap;"></span>
         </div>
-
         <button id="btn-next-top">Next &#8594;</button>
-        <div style="width: 46px;"></div>
+        <span id="topbar-counter" style="font-size:0.85rem; color:#ddd; white-space:nowrap; pointer-events:none;"></span>
     </div>
 
     <button id="help-btn" onclick="toggleHelp()" title="Settings &amp; help">?</button>
@@ -321,12 +319,16 @@
             <input type="range" id="timer-interval" min="1" max="30" value="5">
         </div>
 
+        <div style="margin-top: 1em; display: flex; gap: 8px;">
+            <button id="btn-play" class="play-btn" style="flex:1;">Play</button>
+            <button id="btn-pause" class="play-btn" style="flex:1; display:none;">Pause</button>
+        </div>
+
         <h2 style="margin-top: 1.6em;">Controls</h2>
 
         <h3>Playback</h3>
         <table><tbody>
             <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
-            <tr><td>Play / Pause buttons</td><td>Start or stop auto-advance</td></tr>
         </tbody></table>
 
         <h3>Navigation</h3>
@@ -360,7 +362,8 @@
     <script>
     // ── Nav ────────────────────────────────────────────────────────────────
     fetch('/api/current_user').then(r => r.json()).then(data => {
-        if (data.logged_in && data.user?.role === 'superuser') {
+        const role = data.user?.role;
+        if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
         }
@@ -394,9 +397,9 @@
     })();
 
     // ── Help panel ─────────────────────────────────────────────────────────
-    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
-    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
-    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); document.getElementById('topbar').classList.add('panel-open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); document.getElementById('topbar').classList.remove('panel-open'); }
+    function toggleHelp() { const open = document.getElementById('help-panel').classList.toggle('open'); document.getElementById('topbar').classList.toggle('panel-open', open); }
 
     // ── Persist settings ──────────────────────────────────────────────────
     const saved = JSON.parse(localStorage.getItem('slideshow-settings') || '{}');
@@ -484,6 +487,7 @@
         isPlaying = true;
         document.getElementById('btn-play').style.display = 'none';
         document.getElementById('btn-pause').style.display = 'inline-block';
+        resumeZoom();
         scheduleNext();
     }
 
@@ -493,13 +497,13 @@
         timerHandle = null;
         document.getElementById('btn-play').style.display = 'inline-block';
         document.getElementById('btn-pause').style.display = 'none';
+        pauseZoom();
     }
 
     function scheduleNext() {
         if (!isPlaying) return;
         const raw = parseInt(document.getElementById('timer-interval').value);
-        const zoomOn = document.getElementById('zoom-enabled').checked && focusPersons.some(p => p.zoom);
-        const interval = (zoomOn ? Math.max(raw, 10) : raw) * 1000;
+        const interval = raw * 1000;
         timerHandle = setTimeout(() => {
             if (isPlaying) {
                 const next = currentIndex < queue.length - 1 ? currentIndex + 1 : 0;
@@ -733,16 +737,58 @@
 
     // ── Zoom animation ─────────────────────────────────────────────────────
     let zoomHandle = null;
+    let zoomTarget = null;             // {transform, duration} once computed
+    let zoomDelayStartedAt = null;     // when the 2s pre-zoom delay began
+    let zoomTransitionStartedAt = null; // when the CSS transition began
 
     function resetZoom() {
         if (zoomHandle) { clearTimeout(zoomHandle); zoomHandle = null; }
         const imgEl = document.getElementById('main-img');
         imgEl.style.transition = 'none';
         imgEl.style.transform  = '';
+        zoomTarget = null;
+        zoomDelayStartedAt = null;
+        zoomTransitionStartedAt = null;
+    }
+
+    function pauseZoom() {
+        const imgEl = document.getElementById('main-img');
+        if (zoomHandle) {
+            // Still in the 2s pre-zoom delay — cancel but keep startedAt for resume
+            clearTimeout(zoomHandle);
+            zoomHandle = null;
+        } else if (zoomTarget && zoomTransitionStartedAt) {
+            // In CSS transition — freeze at current computed position
+            const frozen = window.getComputedStyle(imgEl).transform;
+            imgEl.style.transition = 'none';
+            imgEl.style.transform = frozen;
+        }
+    }
+
+    function resumeZoom() {
+        if (!zoomTarget) return;
+        const imgEl = document.getElementById('main-img');
+        if (zoomDelayStartedAt && !zoomTransitionStartedAt) {
+            // Resume from within the initial delay
+            const remaining = Math.max(0, 2000 - (Date.now() - zoomDelayStartedAt));
+            zoomHandle = setTimeout(() => {
+                zoomHandle = null;
+                zoomTransitionStartedAt = Date.now();
+                imgEl.style.transition = `transform ${zoomTarget.duration}s ease-out`;
+                imgEl.style.transform  = zoomTarget.transform;
+            }, remaining);
+        } else if (zoomTransitionStartedAt) {
+            // Resume from within the CSS transition
+            const remaining = Math.max(0, zoomTarget.duration - (Date.now() - zoomTransitionStartedAt) / 1000);
+            if (remaining > 0) {
+                imgEl.offsetHeight; // force reflow so browser sees frozen position
+                imgEl.style.transition = `transform ${remaining}s ease-out`;
+                imgEl.style.transform  = zoomTarget.transform;
+            }
+        }
     }
 
     function unionBbox(bboxes) {
-        // Compute bounding box that encloses all given bboxes
         const valid = bboxes.filter(Boolean);
         if (!valid.length) return null;
         const x1 = Math.min(...valid.map(b => b.x));
@@ -754,12 +800,13 @@
 
     function startZoom(bbox) {
         resetZoom();
-        const timerSec  = Math.max(parseInt(document.getElementById('timer-interval').value), 10);
-        const zoomSec   = timerSec - 2;
+        const timerSec = parseInt(document.getElementById('timer-interval').value);
+        const zoomSec  = Math.max(timerSec - 2, 1);
+        zoomDelayStartedAt = Date.now();
 
         zoomHandle = setTimeout(() => {
             zoomHandle = null;
-            const imgEl  = document.getElementById('main-img');
+            const imgEl   = document.getElementById('main-img');
             const imgRect  = imgEl.getBoundingClientRect();
             const areaEl   = document.getElementById('image-area');
             const areaRect = areaEl.getBoundingClientRect();
@@ -777,8 +824,13 @@
             const panX = areaRect.width  / 2 - imgX - (bbox.x + bbox.width  / 2) * scaleX * Z;
             const panY = areaRect.height / 2 - imgY - (bbox.y + bbox.height / 2) * scaleY * Z;
 
+            zoomTarget = {
+                transform: `translate(${panX}px, ${panY}px) scale(${Z})`,
+                duration: zoomSec,
+            };
+            zoomTransitionStartedAt = Date.now();
             imgEl.style.transition = `transform ${zoomSec}s ease-in-out`;
-            imgEl.style.transform  = `translate(${panX}px, ${panY}px) scale(${Z})`;
+            imgEl.style.transform  = zoomTarget.transform;
         }, 2000);
     }
 
@@ -789,8 +841,6 @@
         const label = `${currentIndex + 1} / ${queue.length}`;
         document.getElementById('progress').textContent = label;
         document.getElementById('topbar-counter').textContent = label;
-        document.getElementById('btn-prev-top').disabled = currentIndex === 0;
-        document.getElementById('btn-next-top').disabled = currentIndex === queue.length - 1;
     }
 
     function prefetchNext() {

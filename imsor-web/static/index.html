@@ -12,10 +12,27 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 60px 20px;
         }
-        h1 { margin-bottom: 40px; font-size: 1.8rem; }
+        #topbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+            padding: 0 50px;
+        }
+        #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
+        #site-nav { display: flex; gap: 14px; align-items: center; margin-left: 20px; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 20px;
+        }
         .nav-grid {
             display: flex;
             gap: 30px;
@@ -53,7 +70,18 @@
     </style>
 </head>
 <body>
-    <h1>ImSor</h1>
+    <div id="topbar">
+        <span id="topbar-title">ImSor</span>
+        <div id="site-nav">
+            <a href="/duplicates">Duplicates</a>
+            <a href="/annotations">Annotations</a>
+            <a href="/rate">Rate</a>
+            <a href="/slideshow">Slideshow</a>
+            <a href="/users" id="nav-users" style="display:none">Users</a>
+            <a href="/admin"  id="nav-admin" style="display:none">Admin</a>
+        </div>
+    </div>
+    <div id="main-content">
     <div class="nav-grid">
         <a class="nav-card" href="/duplicates">
             <div class="icon">&#128247;</div>
@@ -87,6 +115,7 @@
         </a>
     </div>
     <div id="auth-section" style="margin-top: 40px;"></div>
+    </div><!-- /#main-content -->
     <script>
     async function init() {
         const section = document.getElementById('auth-section');
@@ -103,9 +132,11 @@
                         <a href="/logout" style="margin-left:20px;background:#e74c3c;color:white;padding:8px 18px;border-radius:4px;text-decoration:none;font-weight:600;">Logout</a>
                     </div>
                 `;
-                if (user.role === 'superuser') {
+                if (user.role === 'maintainer' || user.role === 'superuser') {
                     document.getElementById('users-nav-card').style.display = '';
                     document.getElementById('admin-nav-card').style.display = '';
+                    document.getElementById('nav-users').style.display = '';
+                    document.getElementById('nav-admin').style.display = '';
                 }
             } else {
                 section.innerHTML = `

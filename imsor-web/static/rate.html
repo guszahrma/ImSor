@@ -35,8 +35,10 @@
         #site-nav a:hover { color: #fff; }
         #status {
             position: absolute; right: 50px;
-            color: #888; font-size: 0.85rem; white-space: nowrap; pointer-events: none;
+            color: #ddd; font-size: 0.85rem; white-space: nowrap; pointer-events: none;
+            transition: right 0.25s ease;
         }
+        #topbar.panel-open #status { right: 364px; }
         button {
             padding: 7px 18px; font-size: 0.9rem;
             border: none; border-radius: 4px; cursor: pointer;
@@ -44,6 +46,13 @@
         }
         button:hover { background: #5a5aaa; }
         button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #btn-prev, #btn-next {
+            padding: 5px 12px; font-size: 0.9rem;
+            background: #252545; color: #888;
+            transition: background 0.1s, color 0.1s; flex-shrink: 0;
+        }
+        #btn-prev:hover, #btn-next:hover { background: #3a3a6a; color: #ddd; }
+        #btn-prev:disabled, #btn-next:disabled { opacity: 0.3; }
 
         /* ── Loading / done ──────────────────────────────────────────────── */
         #loading-area {
@@ -244,12 +253,12 @@
 <body>
 
     <div id="topbar">
+        <button id="btn-prev" onclick="navigate(-1)">&#9664; Prev</button>
         <span id="topbar-title">ImSor — Rate</span>
-        <button id="btn-prev" onclick="navigate(-1)">&#9664; Previous</button>
         <div id="site-nav">
             <a href="/">Home</a>
-            <a href="/annotations">Annotations</a>
             <a href="/duplicates">Duplicates</a>
+            <a href="/annotations">Annotations</a>
             <a href="/slideshow">Slideshow</a>
             <a href="/users" id="nav-users" style="display:none">Users</a>
             <a href="/admin" id="nav-admin" style="display:none">Admin</a>
@@ -331,9 +340,9 @@
 
     <script>
     // ── Help panel ─────────────────────────────────────────────────────────
-    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
-    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
-    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); document.getElementById('topbar').classList.add('panel-open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); document.getElementById('topbar').classList.remove('panel-open'); }
+    function toggleHelp() { const open = document.getElementById('help-panel').classList.toggle('open'); document.getElementById('topbar').classList.toggle('panel-open', open); }
 
     // ── Zoom / pan ─────────────────────────────────────────────────────────
     const viewport  = document.getElementById('viewport');
@@ -430,7 +439,8 @@
 
     // ── Nav ────────────────────────────────────────────────────────────────
     fetch('/api/current_user').then(r => r.json()).then(data => {
-        if (data.logged_in && data.user?.role === 'superuser') {
+        const role = data.user?.role;
+        if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
         }
@@ -509,8 +519,6 @@
         const ratedCount = queue.filter(q => q.rating !== null).length;
         document.getElementById('status').textContent =
             `Image ${currentIndex + 1} of ${queue.length} · ${ratedCount} rated`;
-        document.getElementById('btn-prev').disabled = currentIndex === 0;
-        document.getElementById('btn-next').disabled = currentIndex === queue.length - 1;
     }
 
     function prefetchNext() {
@@ -720,9 +728,7 @@
 
     // ── Navigation ─────────────────────────────────────────────────────────
     function navigate(delta) {
-        const next = currentIndex + delta;
-        if (next < 0 || next >= queue.length) return;
-        showImage(next);
+        showImage((currentIndex + delta + queue.length) % queue.length);
     }
 
     // ── Keyboard ───────────────────────────────────────────────────────────

@@ -13,10 +13,22 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
         }
-
-        h1 { margin-bottom: 8px; font-size: 1.4rem; }
+        #topbar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 46px;
+            border-bottom: 1px solid #2a2a4a;
+            flex-shrink: 0;
+            padding: 0 50px;
+        }
+        #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
+        #site-nav { display: flex; gap: 14px; align-items: center; margin-left: 20px; }
+        #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
+        #site-nav a:hover { color: #fff; }
+        #page-content { display: flex; flex-direction: column; align-items: center; padding: 20px; width: 100%; }
 
         #hint {
             font-size: 0.8rem;
@@ -24,7 +36,6 @@
             margin-bottom: 6px;
         }
 
-        #status { color: #aaa; font-size: 0.9rem; margin-bottom: 6px; }
 
         #progress-wrap {
             width: 320px; height: 5px;
@@ -135,51 +146,118 @@
         .btn-skip    { background: #37474f; }
         .btn-skip:hover { background: #455a64; }
 
-        /* Nav */
-        #nav-bar {
-            display: flex;
-            gap: 14px;
-            margin-bottom: 8px;
-        }
         .btn-nav {
-            padding: 7px 18px;
-            font-size: 0.85rem;
+            padding: 5px 12px;
+            font-size: 0.9rem;
             border: none; border-radius: 4px;
             cursor: pointer;
-            background: #4a4a8a; color: #fff;
+            background: #252545; color: #888;
+            transition: background 0.1s, color 0.1s;
+            flex-shrink: 0;
         }
-        .btn-nav:hover { background: #5a5aaa; }
-        .btn-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-nav:hover { background: #3a3a6a; color: #ddd; }
+        .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+        #topbar-status { position: absolute; right: 50px; font-size: 0.8rem; color: #ddd; white-space: nowrap; pointer-events: none; }
 
         #loading { font-size: 1.1rem; color: #aaa; margin-top: 40px; }
         #empty    { font-size: 1rem;  color: #aaa; margin-top: 30px; }
+
+        /* ── Help button ─────────────────────────────────────────────────── */
+        #help-btn {
+            position: fixed; top: 7px; right: 14px;
+            background: #333; border: none; border-radius: 50%;
+            width: 32px; height: 32px; font-size: 0.95rem; color: #ccc;
+            cursor: pointer; z-index: 99;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+        }
+        #help-btn:hover { background: #555; color: #fff; }
+
+        /* ── Help panel ──────────────────────────────────────────────────── */
+        #help-panel {
+            position: fixed; top: 0; right: 0;
+            width: 300px; height: 100vh;
+            background: #1a1a2a; border-left: 1px solid #444;
+            padding: 2em 1.5em; overflow-y: auto;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        #help-panel.open { transform: translateX(0); }
+        #help-panel h2 { font-size: 1.1rem; margin-bottom: 1.2em; color: #ddd; }
+        #help-panel h3 {
+            font-size: 0.78rem; color: #777; text-transform: uppercase;
+            letter-spacing: 0.08em; margin: 1.2em 0 0.5em;
+        }
+        #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
+        #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        #help-close {
+            position: absolute; top: 0.8em; right: 1em;
+            background: none; border: none; color: #777;
+            font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1;
+        }
+        #help-close:hover { color: #fff; }
+        kbd {
+            display: inline-block; background: #2a2a3a; border: 1px solid #555;
+            border-radius: 3px; padding: 1px 6px;
+            font-family: monospace; font-size: 0.78rem; color: #ccc;
+        }
     </style>
 </head>
 <body>
-    <div id="site-nav" style="align-self:flex-start;margin-bottom:1em;font-size:0.9em;">
-      <a href="/" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Home</a>
-      <a href="/annotations" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Annotations</a>
-      <a href="/rate" style="color:#aaa;text-decoration:none;margin-right:1.5em;">Rate</a>
-      <a href="/users" id="nav-users" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Users</a>
-      <a href="/admin" id="nav-admin" style="color:#aaa;text-decoration:none;margin-right:1.5em;display:none;">Admin</a>
+    <div id="topbar">
+        <button class="btn-nav" id="btn-prev" onclick="navigate(-1)">&#9664; Prev</button>
+        <span id="topbar-title">ImSor — Duplicates</span>
+        <div id="site-nav">
+            <a href="/">Home</a>
+            <a href="/annotations">Annotations</a>
+            <a href="/rate">Rate</a>
+            <a href="/slideshow">Slideshow</a>
+            <a href="/users" id="nav-users" style="display:none">Users</a>
+            <a href="/admin" id="nav-admin" style="display:none">Admin</a>
+        </div>
+        <button class="btn-nav" id="btn-next" onclick="navigate(1)">Next &#9654;</button>
+        <span id="topbar-status"></span>
     </div>
-    <h1>ImSor — Duplicate Reviewer</h1>
+
+    <button id="help-btn" onclick="toggleHelp()" title="Help (H)">?</button>
+
+    <div id="help-panel">
+        <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+        <h2>Controls</h2>
+        <h3>Voting</h3>
+        <table><tbody>
+            <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>…</td><td>Mark image as original (by position)</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Submit vote for this cluster</td></tr>
+        </tbody></table>
+        <h3>Navigation</h3>
+        <table><tbody>
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next cluster</td></tr>
+            <tr><td>Prev / Next buttons</td><td>Previous / next cluster</td></tr>
+        </tbody></table>
+        <h3>This panel</h3>
+        <table><tbody>
+            <tr><td><kbd>?</kbd> button</td><td>Toggle this panel</td></tr>
+            <tr><td><kbd>H</kbd></td><td>Toggle this panel</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close this panel</td></tr>
+        </tbody></table>
+    </div>
+
+    <div id="page-content">
     <div id="hint">Keys: 1 2 3… set original · Enter submit · ← → navigate</div>
     <div id="progress-wrap" style="display:none;"><div id="progress-bar"></div></div>
-    <div id="status"></div>
-    <div id="nav-bar" style="display:none;">
-        <button class="btn-nav" id="btn-prev" onclick="navigate(-1)">&#9664; Prev</button>
-        <button class="btn-nav" id="btn-next" onclick="navigate(1)">Next &#9654;</button>
-    </div>
+
     <div id="loading">Loading clusters…</div>
     <div id="empty"  style="display:none;">No duplicate clusters to review — all done!</div>
     <div id="image-strip"></div>
     <div id="action-bar" style="display:none;"></div>
 
     <script>
-    // Nav: show superuser-only links
+    // Nav
     fetch('/api/current_user').then(r => r.json()).then(data => {
-        if (data.logged_in && data.user?.role === 'superuser') {
+        const role = data.user?.role;
+        if (role === 'maintainer' || role === 'superuser') {
             document.getElementById('nav-users').style.display = '';
             document.getElementById('nav-admin').style.display = '';
         }
@@ -225,7 +303,6 @@
         }
 
         document.getElementById("progress-wrap").style.display = "block";
-        document.getElementById("nav-bar").style.display = "flex";
         document.getElementById("action-bar").style.display = "flex";
         showCluster();
     }
@@ -331,10 +408,8 @@
         const isSubmitted = submittedInSession.has(cid);
         const pending = clusters.filter(c => !submittedInSession.has(c.cluster_id)).length;
         const badge = isSubmitted ? "  ✓ submitted" : "";
-        document.getElementById("status").textContent =
-            `Cluster ${currentIndex + 1} of ${clusters.length}  ·  ${submittedInSession.size} submitted, ${pending} pending${badge}`;
-        document.getElementById("btn-prev").disabled = currentIndex === 0;
-        document.getElementById("btn-next").disabled = currentIndex === clusters.length - 1;
+        document.getElementById("topbar-status").textContent =
+            `${currentIndex + 1} / ${clusters.length}  ·  ${submittedInSession.size} submitted, ${pending} pending${badge}`;
     }
 
     function render() {
@@ -525,13 +600,18 @@
     // Navigation
     // -------------------------------------------------------------------
     function navigate(delta) {
-        currentIndex = Math.max(0, Math.min(clusters.length - 1, currentIndex + delta));
+        currentIndex = (currentIndex + delta + clusters.length) % clusters.length;
         showCluster();
     }
 
     // -------------------------------------------------------------------
     // Keyboard
     // -------------------------------------------------------------------
+    // ── Help panel ─────────────────────────────────────────────────────────
+    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
+    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+
     document.addEventListener("keydown", e => {
         // Don't intercept keys when a select/button has focus
         if (e.target.tagName === "SELECT") return;
@@ -555,6 +635,8 @@
 
         if (e.key === "ArrowLeft")  { navigate(-1); return; }
         if (e.key === "ArrowRight") { navigate(1);  return; }
+        if (e.key === "Escape")     { closeHelp();  return; }
+        if (e.key === "h" || e.key === "H") { toggleHelp(); return; }
     });
 
     // -------------------------------------------------------------------
@@ -562,5 +644,6 @@
     // -------------------------------------------------------------------
     loadClusters();
     </script>
+    </div><!-- /#page-content -->
 </body>
 </html>
