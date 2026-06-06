@@ -154,13 +154,16 @@ def bbox_queue(
     if not ai_anns:
         return []
 
-    # Filter by date_taken cutoff
+    # Filter by date_taken cutoff; keep date_taken for queue response
     all_image_ids = {ann.image_id for ann in ai_anns}
-    eligible_ids = {
-        img.id for img in db.query(Image).filter(
-            Image.id.in_(all_image_ids),
-            Image.date_taken >= DATE_CUTOFF,
-        ).all()
+    eligible_images = db.query(Image).filter(
+        Image.id.in_(all_image_ids),
+        Image.date_taken >= DATE_CUTOFF,
+    ).all()
+    eligible_ids = {img.id for img in eligible_images}
+    date_taken_by_image: dict[int, str | None] = {
+        img.id: img.date_taken.isoformat() if img.date_taken else None
+        for img in eligible_images
     }
     ai_anns = [ann for ann in ai_anns if ann.image_id in eligible_ids]
     if not ai_anns:
@@ -267,6 +270,7 @@ def bbox_queue(
             # Legacy compat fields
             "named_count": any_count,
             "unnamed_count": total - any_count,
+            "date_taken": date_taken_by_image.get(image_id),
         })
 
     result.sort(key=lambda x: (x["tier"], -(avg_rating.get(x["image_id"]) or 0), -x["total_count"]))

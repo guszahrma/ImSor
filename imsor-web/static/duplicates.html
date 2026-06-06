@@ -171,7 +171,8 @@
         }
         .btn-nav:hover { background: #3a3a6a; color: #ddd; }
         .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
-        #topbar-status { position: absolute; right: 50px; font-size: 0.8rem; color: #ddd; white-space: nowrap; pointer-events: none; }
+        #topbar-status { position: absolute; right: 50px; font-size: 0.8rem; color: #ddd; white-space: nowrap; pointer-events: none; transition: right 0.25s ease; }
+        #topbar.panel-open #topbar-status { right: 370px; }
 
         #loading { font-size: 1.1rem; color: #aaa; margin-top: 40px; }
         #empty    { font-size: 1rem;  color: #aaa; margin-top: 30px; }
@@ -212,6 +213,16 @@
             font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1;
         }
         #help-close:hover { color: #fff; }
+        .date-range-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+        .date-range-row input[type="date"] {
+            flex: 1; padding: 4px 6px; font-size: 0.82rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px;
+            color: #e0e0e0; color-scheme: dark;
+        }
+        .date-range-row span { color: #666; font-size: 0.8rem; flex-shrink: 0; }
+        .order-toggle { display: flex; gap: 12px; margin-top: 4px; }
+        .order-toggle label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
+        .order-toggle input[type="radio"] { accent-color: #6a6aaa; }
         kbd {
             display: inline-block; background: #2a2a3a; border: 1px solid #555;
             border-radius: 3px; padding: 1px 6px;
@@ -240,6 +251,22 @@
 
     <div id="help-panel">
         <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+        <h2>Settings</h2>
+        <div style="margin-bottom:0.8em;">
+            <label style="font-size:0.85rem;color:#aaa;">Date range</label>
+            <div class="date-range-row">
+                <input type="date" id="date-from" title="From">
+                <span>–</span>
+                <input type="date" id="date-to" title="To">
+            </div>
+        </div>
+        <div style="margin-bottom:1.4em;">
+            <label style="font-size:0.85rem;color:#aaa;">Order</label>
+            <div class="order-toggle">
+                <label><input type="radio" name="order-mode" value="chronological" checked> Chronological</label>
+                <label><input type="radio" name="order-mode" value="random"> Random</label>
+            </div>
+        </div>
         <h2>Controls</h2>
         <h3>Voting</h3>
         <table><tbody>
@@ -281,6 +308,7 @@
     // -------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------
+    let fullClusters = [];
     let clusters = [];
     let currentIndex = 0;
     // rotation_correction overrides per image_id (applied on top of exif_orientation)
@@ -294,6 +322,78 @@
     const submittedInSession = new Set();
 
     // -------------------------------------------------------------------
+    // Date filter
+    // -------------------------------------------------------------------
+    function passesDateFilter(dateTaken, dateFrom, dateTo) {
+        if (!dateFrom && !dateTo) return true;
+        if (!dateTaken) return !dateFrom || !dateTo;
+        const d = dateTaken.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo   && d > dateTo)   return false;
+        return true;
+    }
+
+    function applyDateFilter() {
+        if (fullClusters.length === 0) return;  // not yet loaded
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo   = document.getElementById('date-to').value;
+        clusters = fullClusters.filter(c =>
+            passesDateFilter(c.images[0]?.date_taken, dateFrom, dateTo)
+        );
+        const orderMode = document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological';
+        if (orderMode === 'random') {
+            for (let i = clusters.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [clusters[i], clusters[j]] = [clusters[j], clusters[i]];
+            }
+        } else {
+            clusters.sort((a, b) => {
+                const da = (a.images[0]?.date_taken || '').slice(0, 10);
+                const db = (b.images[0]?.date_taken || '').slice(0, 10);
+                return da < db ? -1 : da > db ? 1 : 0;
+            });
+        }
+        currentIndex = 0;
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("progress-wrap").style.display = "block";
+        if (clusters.length === 0) {
+            document.getElementById("empty").style.display = "block";
+            document.getElementById("empty").textContent = "No clusters match the current filter.";
+            document.getElementById("image-strip").innerHTML = "";
+            document.getElementById("action-bar").style.display = "none";
+            return;
+        }
+        document.getElementById("empty").style.display = "none";
+        document.getElementById("action-bar").style.display = "flex";
+        showCluster();
+    }
+
+    const DUPLICATES_SETTINGS_KEY = 'imsor-duplicates-settings';
+
+    function saveSettings() {
+        localStorage.setItem(DUPLICATES_SETTINGS_KEY, JSON.stringify({
+            dateFrom:  document.getElementById('date-from').value,
+            dateTo:    document.getElementById('date-to').value,
+            orderMode: document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological',
+        }));
+    }
+
+    function loadSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(DUPLICATES_SETTINGS_KEY) || '{}');
+            if (saved.dateFrom) document.getElementById('date-from').value = saved.dateFrom;
+            if (saved.dateTo)   document.getElementById('date-to').value   = saved.dateTo;
+            if (saved.orderMode) { const el = document.querySelector(`input[name="order-mode"][value="${saved.orderMode}"]`); if (el) el.checked = true; }
+        } catch (_) {}
+    }
+
+    document.getElementById('date-from').addEventListener('change', () => { applyDateFilter(); saveSettings(); });
+    document.getElementById('date-to').addEventListener('change',   () => { applyDateFilter(); saveSettings(); });
+    document.querySelectorAll('input[name="order-mode"]').forEach(el =>
+        el.addEventListener('change', () => { applyDateFilter(); saveSettings(); })
+    );
+
+    // -------------------------------------------------------------------
     // Boot
     // -------------------------------------------------------------------
     async function loadClusters() {
@@ -305,23 +405,20 @@
                 return;
             }
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            clusters = await resp.json();
+            fullClusters = await resp.json();
         } catch (err) {
             document.getElementById("loading").textContent =
                 "Error loading clusters: " + err.message;
             return;
         }
-
         document.getElementById("loading").style.display = "none";
-
-        if (clusters.length === 0) {
+        if (fullClusters.length === 0) {
             document.getElementById("empty").style.display = "block";
             return;
         }
-
         document.getElementById("progress-wrap").style.display = "block";
         document.getElementById("action-bar").style.display = "flex";
-        showCluster();
+        applyDateFilter();
     }
 
     // -------------------------------------------------------------------
@@ -653,9 +750,9 @@
     }
 
     // ── Help panel ─────────────────────────────────────────────────────────
-    function openHelp()   { document.getElementById('help-panel').classList.add('open'); }
-    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); }
-    function toggleHelp() { document.getElementById('help-panel').classList.toggle('open'); }
+    function openHelp()   { document.getElementById('help-panel').classList.add('open');    document.getElementById('topbar').classList.add('panel-open'); }
+    function closeHelp()  { document.getElementById('help-panel').classList.remove('open'); document.getElementById('topbar').classList.remove('panel-open'); }
+    function toggleHelp() { const open = document.getElementById('help-panel').classList.toggle('open'); document.getElementById('topbar').classList.toggle('panel-open', open); }
 
     document.addEventListener("keydown", e => {
         // Don't intercept keys when a select/button has focus
@@ -687,6 +784,7 @@
     // -------------------------------------------------------------------
     // Start
     // -------------------------------------------------------------------
+    loadSettings();
     loadClusters();
     </script>
     </div><!-- /#page-content -->

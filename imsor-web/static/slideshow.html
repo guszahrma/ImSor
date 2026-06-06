@@ -114,37 +114,16 @@
         #timer-display { font-size: 0.85rem; color: #aaa; }
 
         /* ── Year range slider ───────────────────────────────────────────── */
-        #year-filter-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        #year-filter-row input[type="checkbox"] { accent-color: #6a6aaa; width: 14px; height: 14px; }
-        #year-slider-wrap {
-            margin-top: 6px; position: relative; height: 20px;
-            transition: opacity 0.2s;
+        .date-range-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+        .date-range-row input[type="date"] {
+            flex: 1; padding: 4px 6px; font-size: 0.82rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px;
+            color: #e0e0e0; color-scheme: dark;
         }
-        #year-slider-wrap.disabled { opacity: 0.35; pointer-events: none; }
-        .year-track {
-            position: absolute; top: 8px; left: 0; right: 0;
-            height: 4px; border-radius: 2px; background: #333;
-        }
-        #year-range-fill {
-            position: absolute; height: 100%; background: #6a6aaa; border-radius: 2px;
-        }
-        #year-slider-wrap input[type="range"] {
-            position: absolute; width: 100%; top: 0;
-            -webkit-appearance: none; appearance: none;
-            background: transparent; pointer-events: none;
-            margin: 0; padding: 0; height: 20px;
-        }
-        #year-slider-wrap input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none;
-            pointer-events: all; width: 14px; height: 14px;
-            border-radius: 50%; background: #8888cc;
-            border: 2px solid #aaaaee; cursor: pointer;
-        }
-        #year-slider-wrap input[type="range"]::-moz-range-thumb {
-            pointer-events: all; width: 14px; height: 14px;
-            border-radius: 50%; background: #8888cc;
-            border: 2px solid #aaaaee; cursor: pointer; box-sizing: border-box;
-        }
+        .date-range-row span { color: #666; font-size: 0.8rem; flex-shrink: 0; }
+        .order-toggle { display: flex; gap: 12px; margin-top: 4px; }
+        .order-toggle label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
+        .order-toggle input[type="radio"] { accent-color: #6a6aaa; }
 
         /* ── Focus persons ───────────────────────────────────────────────── */
         #focus-persons-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -265,15 +244,20 @@
             <input type="range" id="min-raters" min="1" max="10" step="1" value="2">
         </div>
 
-        <div class="setting-row" id="year-filter-row" style="margin-top: 0.8em;">
-            <label>
-                <input type="checkbox" id="year-filter-enabled">
-                Year: <span id="year-range-display"></span>
-            </label>
-            <div id="year-slider-wrap" class="disabled">
-                <div class="year-track"><div id="year-range-fill"></div></div>
-                <input type="range" id="year-min">
-                <input type="range" id="year-max">
+        <div class="setting-row" style="margin-top: 0.8em;">
+            <label for="date-from">Date range</label>
+            <div class="date-range-row">
+                <input type="date" id="date-from" title="From">
+                <span>–</span>
+                <input type="date" id="date-to" title="To">
+            </div>
+        </div>
+
+        <div class="setting-row" style="margin-top: 0.8em;">
+            <label>Order</label>
+            <div class="order-toggle">
+                <label><input type="radio" name="order-mode" value="chronological" checked> Chronological</label>
+                <label><input type="radio" name="order-mode" value="random"> Random</label>
             </div>
         </div>
 
@@ -387,19 +371,6 @@
     // All persons from server: [{id, name, birthdate}]
     let allPersons = [];
 
-    // ── Year slider setup ──────────────────────────────────────────────────
-    const CURRENT_YEAR = new Date().getFullYear();
-    const YEAR_MIN_BOUND = CURRENT_YEAR - 100;
-    const YEAR_MAX_BOUND = CURRENT_YEAR;
-
-    (function initYearSlider() {
-        const minEl = document.getElementById('year-min');
-        const maxEl = document.getElementById('year-max');
-        minEl.min = YEAR_MIN_BOUND; minEl.max = YEAR_MAX_BOUND; minEl.step = 1;
-        maxEl.min = YEAR_MIN_BOUND; maxEl.max = YEAR_MAX_BOUND; maxEl.step = 1;
-        minEl.value = YEAR_MIN_BOUND;
-        maxEl.value = YEAR_MAX_BOUND;
-    })();
 
     // ── Help panel ─────────────────────────────────────────────────────────
     function openHelp()   { document.getElementById('help-panel').classList.add('open'); document.getElementById('topbar').classList.add('panel-open'); }
@@ -420,13 +391,9 @@
         document.getElementById('timer-interval').value = saved.timerInterval;
         document.getElementById('timer-display').textContent = saved.timerInterval + 's';
     }
-    if (saved.yearFilterEnabled) {
-        document.getElementById('year-filter-enabled').checked = true;
-        document.getElementById('year-slider-wrap').classList.remove('disabled');
-    }
-    if (saved.yearMin !== undefined) document.getElementById('year-min').value = saved.yearMin;
-    if (saved.yearMax !== undefined) document.getElementById('year-max').value = saved.yearMax;
-    updateYearSliderDisplay();
+    if (saved.dateFrom) document.getElementById('date-from').value = saved.dateFrom;
+    if (saved.dateTo)   document.getElementById('date-to').value   = saved.dateTo;
+    if (saved.orderMode) { const el = document.querySelector(`input[name="order-mode"][value="${saved.orderMode}"]`); if (el) el.checked = true; }
     if (saved.zoomEnabled) {
         document.getElementById('zoom-enabled').checked = true;
         document.getElementById('zoom-controls').style.opacity = '1';
@@ -454,9 +421,9 @@
             minRating:        document.getElementById('min-rating').value,
             minRaters:        document.getElementById('min-raters').value,
             timerInterval:    document.getElementById('timer-interval').value,
-            yearFilterEnabled: document.getElementById('year-filter-enabled').checked,
-            yearMin:          document.getElementById('year-min').value,
-            yearMax:          document.getElementById('year-max').value,
+            dateFrom:  document.getElementById('date-from').value,
+            dateTo:    document.getElementById('date-to').value,
+            orderMode: document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological',
             zoomEnabled:      document.getElementById('zoom-enabled').checked,
             zoomMargin:       document.getElementById('zoom-margin').value,
             locationEnabled:  document.getElementById('location-enabled').checked,
@@ -548,32 +515,23 @@
         applyFilters(true);
     }
 
-    // ── Year filter ────────────────────────────────────────────────────────
-    function updateYearSliderDisplay() {
-        const min = parseInt(document.getElementById('year-min').value);
-        const max = parseInt(document.getElementById('year-max').value);
-        const span = YEAR_MAX_BOUND - YEAR_MIN_BOUND;
-        const leftPct  = ((min - YEAR_MIN_BOUND) / span) * 100;
-        const rightPct = ((max - YEAR_MIN_BOUND) / span) * 100;
-        document.getElementById('year-range-fill').style.left  = leftPct + '%';
-        document.getElementById('year-range-fill').style.width = (rightPct - leftPct) + '%';
-        document.getElementById('year-range-display').textContent =
-            min === max ? `${min}` : `${min} – ${max}`;
+    function passesDateFilter(dateTaken, dateFrom, dateTo) {
+        if (!dateFrom && !dateTo) return true;
+        if (!dateTaken) return !dateFrom || !dateTo;
+        const d = dateTaken.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo   && d > dateTo)   return false;
+        return true;
     }
 
     function applyFilters(autoplay = false) {
         let filtered = fullQueue;
 
-        // Year filter (client-side)
-        const yearEnabled = document.getElementById('year-filter-enabled').checked;
-        if (yearEnabled) {
-            const minYear = parseInt(document.getElementById('year-min').value);
-            const maxYear = parseInt(document.getElementById('year-max').value);
-            filtered = filtered.filter(item => {
-                if (!item.date_taken) return false;
-                const y = new Date(item.date_taken).getFullYear();
-                return y >= minYear && y <= maxYear;
-            });
+        // Date filter (client-side)
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo   = document.getElementById('date-to').value;
+        if (dateFrom || dateTo) {
+            filtered = filtered.filter(item => passesDateFilter(item.date_taken, dateFrom, dateTo));
         }
 
         // Location-only filter
@@ -583,6 +541,21 @@
             filtered = filtered.filter(item => item.latitude != null && item.longitude != null);
         }
 
+        // Order
+        const orderMode = document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological';
+        if (orderMode === 'random') {
+            filtered = [...filtered];
+            for (let i = filtered.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+            }
+        } else {
+            filtered = [...filtered].sort((a, b) => {
+                const da = (a.date_taken || '').slice(0, 10);
+                const db = (b.date_taken || '').slice(0, 10);
+                return da < db ? -1 : da > db ? 1 : 0;
+            });
+        }
         queue = filtered;
 
         if (queue.length === 0) {
@@ -599,25 +572,12 @@
         if (autoplay) startAutoplay();
     }
 
-    // Year filter controls
-    document.getElementById('year-filter-enabled').addEventListener('change', function () {
-        document.getElementById('year-slider-wrap').classList.toggle('disabled', !this.checked);
-        applyFilters(); saveSettings();
-    });
-    document.getElementById('year-min').addEventListener('input', function () {
-        const max = parseInt(document.getElementById('year-max').value);
-        if (parseInt(this.value) > max) this.value = max;
-        updateYearSliderDisplay();
-        if (document.getElementById('year-filter-enabled').checked) applyFilters();
-        saveSettings();
-    });
-    document.getElementById('year-max').addEventListener('input', function () {
-        const min = parseInt(document.getElementById('year-min').value);
-        if (parseInt(this.value) < min) this.value = min;
-        updateYearSliderDisplay();
-        if (document.getElementById('year-filter-enabled').checked) applyFilters();
-        saveSettings();
-    });
+    // Date filter and order controls
+    document.getElementById('date-from').addEventListener('change', function () { applyFilters(); saveSettings(); });
+    document.getElementById('date-to').addEventListener('change',   function () { applyFilters(); saveSettings(); });
+    document.querySelectorAll('input[name="order-mode"]').forEach(el =>
+        el.addEventListener('change', () => { applyFilters(); saveSettings(); })
+    );
 
     // Zoom controls
     document.getElementById('zoom-enabled').addEventListener('change', function () {

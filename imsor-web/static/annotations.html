@@ -159,6 +159,16 @@
         #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
         #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        .date-range-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+        .date-range-row input[type="date"] {
+            flex: 1; padding: 4px 6px; font-size: 0.82rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px;
+            color: #e0e0e0; color-scheme: dark;
+        }
+        .date-range-row span { color: #666; font-size: 0.8rem; flex-shrink: 0; }
+        .order-toggle { display: flex; gap: 12px; margin-top: 4px; }
+        .order-toggle label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
+        .order-toggle input[type="radio"] { accent-color: #6a6aaa; }
         kbd {
             display: inline-block; background: #2a2a3a; border: 1px solid #555;
             border-radius: 3px; padding: 1px 6px;
@@ -305,6 +315,22 @@
 
         <div id="help-panel">
             <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+            <h2>Settings</h2>
+            <div style="margin-bottom:0.8em;">
+                <label style="font-size:0.85rem;color:#aaa;">Date range</label>
+                <div class="date-range-row">
+                    <input type="date" id="date-from" title="From">
+                    <span>–</span>
+                    <input type="date" id="date-to" title="To">
+                </div>
+            </div>
+            <div style="margin-bottom:1.4em;">
+                <label style="font-size:0.85rem;color:#aaa;">Order</label>
+                <div class="order-toggle">
+                    <label><input type="radio" name="order-mode" value="chronological" checked> Chronological</label>
+                    <label><input type="radio" name="order-mode" value="random"> Random</label>
+                </div>
+            </div>
             <h2>Keyboard &amp; mouse guide</h2>
 
             <h3>Navigation</h3>
@@ -398,7 +424,9 @@
     const img       = document.getElementById('main-img');
 
     // ── State ──────────────────────────────────────────────────────────────
+    let fullQueue = [];
     let queue = [];
+    let completedIds = new Set();
     let currentIndex = 0;
     let rotationDeg = 0;
     let imgNatW = 0, imgNatH = 0;
@@ -472,6 +500,80 @@
         viewport.classList.add('panning');
     }
 
+    // ── Date filter ────────────────────────────────────────────────────────
+
+    function passesDateFilter(dateTaken, dateFrom, dateTo) {
+        if (!dateFrom && !dateTo) return true;
+        if (!dateTaken) return !dateFrom || !dateTo;
+        const d = dateTaken.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo   && d > dateTo)   return false;
+        return true;
+    }
+
+    function applyDateFilter() {
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo   = document.getElementById('date-to').value;
+        queue = fullQueue.filter(item =>
+            !completedIds.has(item.image_id) &&
+            passesDateFilter(item.date_taken, dateFrom, dateTo)
+        );
+        const orderMode = document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological';
+        if (orderMode === 'random') {
+            for (let i = queue.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [queue[i], queue[j]] = [queue[j], queue[i]];
+            }
+        } else {
+            queue.sort((a, b) => {
+                if ((a.tier || 0) !== (b.tier || 0)) return (a.tier || 0) - (b.tier || 0);
+                const da = (a.date_taken || '').slice(0, 10);
+                const db = (b.date_taken || '').slice(0, 10);
+                return da < db ? -1 : da > db ? 1 : 0;
+            });
+        }
+        currentIndex = 0;
+        if (queue.length === 0) {
+            document.getElementById('main-layout').style.display = 'none';
+            document.getElementById('loading-area').style.display = 'flex';
+            document.getElementById('loading').textContent =
+                fullQueue.length === 0
+                    ? 'All person detections have been named. Nothing left to annotate.'
+                    : 'No images match the current filter.';
+            return;
+        }
+        document.getElementById('loading-area').style.display = 'none';
+        document.getElementById('main-layout').style.display = 'block';
+        document.getElementById('viewport').style.display = 'block';
+        updateStatus();
+        showImage(0);
+    }
+
+    const ANNOTATIONS_SETTINGS_KEY = 'imsor-annotations-settings';
+
+    function saveSettings() {
+        localStorage.setItem(ANNOTATIONS_SETTINGS_KEY, JSON.stringify({
+            dateFrom:  document.getElementById('date-from').value,
+            dateTo:    document.getElementById('date-to').value,
+            orderMode: document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological',
+        }));
+    }
+
+    function loadSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(ANNOTATIONS_SETTINGS_KEY) || '{}');
+            if (saved.dateFrom) document.getElementById('date-from').value = saved.dateFrom;
+            if (saved.dateTo)   document.getElementById('date-to').value   = saved.dateTo;
+            if (saved.orderMode) { const el = document.querySelector(`input[name="order-mode"][value="${saved.orderMode}"]`); if (el) el.checked = true; }
+        } catch (_) {}
+    }
+
+    document.getElementById('date-from').addEventListener('change', () => { applyDateFilter(); saveSettings(); });
+    document.getElementById('date-to').addEventListener('change',   () => { applyDateFilter(); saveSettings(); });
+    document.querySelectorAll('input[name="order-mode"]').forEach(el =>
+        el.addEventListener('change', () => { applyDateFilter(); saveSettings(); })
+    );
+
     // ── Data fetching ──────────────────────────────────────────────────────
 
     async function fetchImageData(imageId) {
@@ -497,26 +599,13 @@
             ]);
             if (!queueResp.ok) throw new Error(`Queue: HTTP ${queueResp.status}`);
             if (!peopleResp.ok) throw new Error(`People: HTTP ${peopleResp.status}`);
-            queue = await queueResp.json();
+            fullQueue = await queueResp.json();
             knownPeople = await peopleResp.json();
         } catch (err) {
             document.getElementById('loading').textContent = 'Error loading: ' + err.message;
             return;
         }
-
-        document.getElementById('loading-area').style.display = 'none';
-
-        if (queue.length === 0) {
-            document.getElementById('loading-area').style.display = 'flex';
-            document.getElementById('loading').textContent =
-                'All person detections have been named. Nothing left to annotate.';
-            return;
-        }
-
-        document.getElementById('main-layout').style.display = 'block';
-        document.getElementById('viewport').style.display = 'block';
-        updateStatus();
-        await showImage(0);
+        applyDateFilter();
     }
 
     // ── Display ────────────────────────────────────────────────────────────
@@ -1005,6 +1094,7 @@
         else item.named_count--;
         if (item.unnamed_count === 0 || currentAnnotations.length === 0) {
             pushHistory();
+            completedIds.add(item.image_id);
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
             if (currentIndex >= queue.length) currentIndex--;
@@ -1042,6 +1132,7 @@
         if (wasUnnamed) { item.unnamed_count--; item.named_count++; }
         if (item.unnamed_count === 0) {
             pushHistory();
+            completedIds.add(item.image_id);
             queue.splice(currentIndex, 1);
             if (queue.length === 0) { showDone(); return; }
             if (currentIndex >= queue.length) currentIndex--;
@@ -1277,6 +1368,7 @@
     function helpIsOpen() { return document.getElementById('help-panel').classList.contains('open'); }
 
     // ── Boot ───────────────────────────────────────────────────────────────
+    loadSettings();
     loadData();
     </script>
 </body>

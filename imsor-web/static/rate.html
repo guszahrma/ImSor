@@ -241,6 +241,16 @@
         #help-panel table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         #help-panel td { padding: 4px 0; vertical-align: top; color: #ccc; }
         #help-panel td:first-child { white-space: nowrap; padding-right: 1em; }
+        .date-range-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+        .date-range-row input[type="date"] {
+            flex: 1; padding: 4px 6px; font-size: 0.82rem;
+            background: #252545; border: 1px solid #444; border-radius: 4px;
+            color: #e0e0e0; color-scheme: dark;
+        }
+        .date-range-row span { color: #666; font-size: 0.8rem; flex-shrink: 0; }
+        .order-toggle { display: flex; gap: 12px; margin-top: 4px; }
+        .order-toggle label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #ccc; cursor: pointer; }
+        .order-toggle input[type="radio"] { accent-color: #6a6aaa; }
         kbd {
             display: inline-block; background: #2a2a3a; border: 1px solid #555;
             border-radius: 3px; padding: 1px 6px;
@@ -276,6 +286,23 @@
 
     <div id="help-panel">
         <button id="help-close" onclick="closeHelp()">&#x2715;</button>
+        <h2>Settings</h2>
+        <div style="margin-bottom:0.8em;">
+            <label style="font-size:0.85rem;color:#aaa;">Date range</label>
+            <div class="date-range-row">
+                <input type="date" id="date-from" title="From">
+                <span>–</span>
+                <input type="date" id="date-to" title="To">
+            </div>
+        </div>
+        <div style="margin-bottom:1.4em;">
+            <label style="font-size:0.85rem;color:#aaa;">Order</label>
+            <div class="order-toggle">
+                <label><input type="radio" name="order-mode" value="chronological" checked> Chronological</label>
+                <label><input type="radio" name="order-mode" value="random"> Random</label>
+            </div>
+        </div>
+
         <h2>Keyboard &amp; button guide</h2>
 
         <h3>Navigation</h3>
@@ -452,7 +479,9 @@
     }).catch(() => {});
 
     // ── State ──────────────────────────────────────────────────────────────
+    let fullQueue = [];
     let queue = [];          // [{image_id, rating, annotation_id, veto_annotation_id}, …]
+    let skippedIds = new Set();
     let currentIndex = 0;
     const imageCache = new Map();   // image_id → Image object (URL)
 
@@ -497,27 +526,89 @@
             : 'Bookmark — mark for later (B)';
     }
 
+    // ── Date filter ────────────────────────────────────────────────────────
+    function passesDateFilter(dateTaken, dateFrom, dateTo) {
+        if (!dateFrom && !dateTo) return true;
+        if (!dateTaken) return !dateFrom || !dateTo;
+        const d = dateTaken.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo   && d > dateTo)   return false;
+        return true;
+    }
+
+    function applyDateFilter(targetImageId = null) {
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo   = document.getElementById('date-to').value;
+        queue = fullQueue.filter(item =>
+            !skippedIds.has(item.image_id) &&
+            passesDateFilter(item.date_taken, dateFrom, dateTo)
+        );
+        const orderMode = document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological';
+        if (orderMode === 'random') {
+            for (let i = queue.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [queue[i], queue[j]] = [queue[j], queue[i]];
+            }
+        } else {
+            queue.sort((a, b) => {
+                const da = (a.date_taken || '').slice(0, 10);
+                const db = (b.date_taken || '').slice(0, 10);
+                return da < db ? -1 : da > db ? 1 : 0;
+            });
+        }
+        if (queue.length === 0) {
+            document.getElementById('main-layout').style.display = 'none';
+            document.getElementById('loading-area').style.display = 'flex';
+            document.getElementById('loading').textContent =
+                fullQueue.length === 0 ? 'No images to rate.' : 'No images match the current filter.';
+            return;
+        }
+        document.getElementById('loading-area').style.display = 'none';
+        document.getElementById('main-layout').style.display = 'flex';
+        let idx = 0;
+        if (targetImageId !== null) {
+            const found = queue.findIndex(item => item.image_id === targetImageId);
+            if (found !== -1) idx = found;
+        }
+        showImage(idx);
+    }
+
+    const RATE_SETTINGS_KEY = 'imsor-rate-settings';
+
+    function saveSettings() {
+        localStorage.setItem(RATE_SETTINGS_KEY, JSON.stringify({
+            dateFrom:  document.getElementById('date-from').value,
+            dateTo:    document.getElementById('date-to').value,
+            orderMode: document.querySelector('input[name="order-mode"]:checked')?.value ?? 'chronological',
+        }));
+    }
+
+    function loadSettings() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(RATE_SETTINGS_KEY) || '{}');
+            if (saved.dateFrom) document.getElementById('date-from').value = saved.dateFrom;
+            if (saved.dateTo)   document.getElementById('date-to').value   = saved.dateTo;
+            if (saved.orderMode) { const el = document.querySelector(`input[name="order-mode"][value="${saved.orderMode}"]`); if (el) el.checked = true; }
+        } catch (_) {}
+    }
+
+    document.getElementById('date-from').addEventListener('change', () => { applyDateFilter(); saveSettings(); });
+    document.getElementById('date-to').addEventListener('change',   () => { applyDateFilter(); saveSettings(); });
+    document.querySelectorAll('input[name="order-mode"]').forEach(el =>
+        el.addEventListener('change', () => { applyDateFilter(); saveSettings(); })
+    );
+
     // ── Data loading ───────────────────────────────────────────────────────
     async function loadData() {
         try {
             const resp = await fetch('/api/rating-queue');
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            queue = await resp.json();
+            fullQueue = await resp.json();
         } catch (err) {
             document.getElementById('loading').textContent = 'Error loading: ' + err.message;
             return;
         }
-
-        document.getElementById('loading-area').style.display = 'none';
-
-        if (queue.length === 0) {
-            document.getElementById('loading-area').style.display = 'flex';
-            document.getElementById('loading').textContent = 'No images to rate.';
-            return;
-        }
-
-        document.getElementById('main-layout').style.display = 'flex';
-        await showImage(0);
+        applyDateFilter();
     }
 
     function updateStatus() {
@@ -671,7 +762,7 @@
     document.getElementById('btn-bookmark').addEventListener('click', toggleBookmark);
 
     // ── Skip ───────────────────────────────────────────────────────────────
-    const skipUndoStack = [];   // [{item, index, annotationId}, …]
+    const skipUndoStack = [];   // [{item, annotationId}, …]
 
     async function skipImage() {
         const item = queue[currentIndex];
@@ -683,16 +774,10 @@
             });
             if (!resp.ok) throw new Error(await resp.text());
             const ann = await resp.json();
-            skipUndoStack.push({ item, index: currentIndex, annotationId: ann.id });
-            queue.splice(currentIndex, 1);
-            if (queue.length === 0) {
-                document.getElementById('main-layout').style.display = 'none';
-                document.getElementById('loading-area').style.display = 'flex';
-                document.getElementById('loading').textContent = 'No more images to rate.';
-                return;
-            }
-            const next = Math.min(currentIndex, queue.length - 1);
-            await showImage(next);
+            skipUndoStack.push({ item, annotationId: ann.id });
+            const nextId = queue[currentIndex + 1]?.image_id ?? queue[currentIndex - 1]?.image_id ?? null;
+            skippedIds.add(item.image_id);
+            applyDateFilter(nextId);
         } catch (err) {
             alert('Error saving skip: ' + err.message);
         }
@@ -700,13 +785,12 @@
 
     async function undoSkip() {
         if (skipUndoStack.length === 0) return;
-        const { item, index, annotationId } = skipUndoStack.pop();
+        const { item, annotationId } = skipUndoStack.pop();
         try {
             const resp = await fetch(`/api/annotations/${annotationId}`, { method: 'DELETE' });
             if (!resp.ok) throw new Error(await resp.text());
-            const insertAt = Math.min(index, queue.length);
-            queue.splice(insertAt, 0, item);
-            await showImage(insertAt);
+            skippedIds.delete(item.image_id);
+            applyDateFilter(item.image_id);
         } catch (err) {
             alert('Error undoing skip: ' + err.message);
         }
@@ -809,6 +893,7 @@
     }
 
     // ── Boot ───────────────────────────────────────────────────────────────
+    loadSettings();
     loadSelmasBirthdate();
     loadData();
     </script>
