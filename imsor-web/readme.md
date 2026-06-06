@@ -5,20 +5,46 @@ with more features (annotations, etc.) coming soon.
 
 ## Prerequisites
 
-1. Install Python 3.10 or newer from <https://www.python.org/downloads/>
+### Linux / WSL
+
+1. Install system libraries required by the AI dependency (ultralytics/PyTorch):
+   ```bash
+   sudo apt-get install liblzma-dev
+   ```
+   > **Important:** If you are building Python from source (e.g. via `./configure && make`),
+   > install `liblzma-dev` *before* building Python. The `_lzma` C extension is compiled
+   > into the interpreter — adding the library afterwards requires a Python rebuild.
+   > If you install Python via `apt` (`apt install python3.11`) or `pyenv`, this is handled
+   > automatically as long as `liblzma-dev` is present at install time.
+
+2. Navigate to the imsor-web folder:
+   ```bash
+   cd imsor-web
+   ```
+3. Create a virtual environment:
+   ```bash
+   python3.11 -m venv venv
+   ```
+4. Install dependencies:
+   ```bash
+   venv/bin/pip install -r requirements.txt
+   ```
+
+### Windows
+
+1. Install Python 3.11 or newer from <https://www.python.org/downloads/>
    - During installation, check **Add Python to PATH**.
 2. Open a terminal and navigate to the imsor-web folder:
    ```
    cd imsor-web
    ```
-3. Create and activate a virtual environment:
+3. Create a virtual environment:
    ```
    python -m venv venv
-   .\venv\Scripts\Activate.ps1
    ```
 4. Install dependencies:
    ```
-   python -m pip install -r requirements.txt
+   venv\Scripts\pip install -r requirements.txt
    ```
 
 
@@ -68,13 +94,24 @@ Edit [`config.py`](config.py) before running:
 
 
 
-## Start your Flask server:
+## Start the server
 
-   ```
-   python server.py
-   ```
+Always start the server using the **venv Python**, not the system Python — this ensures the correct packages (including ultralytics/YOLO) are used:
 
-   Visit `https://127.0.0.1:8080` (or your local IP and port). Your browser will warn about the self-signed certificate—this is expected for local development.
+**Linux / WSL:**
+```bash
+venv/bin/python server.py
+```
+
+**Windows:**
+```
+venv\Scripts\python.exe server.py
+```
+
+> **Note:** Do not use `python server.py` directly — the system Python does not have the
+> required packages and YOLO auto-annotation will silently fail.
+
+Visit `https://127.0.0.1:8080` (or your local IP and port). Your browser will warn about the self-signed certificate — this is expected for local development.
 
 ---
 
