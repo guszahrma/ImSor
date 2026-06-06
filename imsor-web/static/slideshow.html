@@ -32,6 +32,10 @@
         }
         #topbar-counter { position: absolute; right: 50px; transition: right 0.25s ease; }
         #topbar.panel-open #topbar-counter { right: 364px; }
+        #topbar-date {
+            position: absolute; left: 10px;
+            color: #ddd; font-size: 0.9rem; white-space: nowrap; pointer-events: none;
+        }
         #topbar-title { font-size: 1.05rem; font-weight: 600; color: #ddd; white-space: nowrap; }
         #site-nav { display: flex; gap: 14px; align-items: center; }
         #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
@@ -231,6 +235,7 @@
 <body>
 
     <div id="topbar">
+        <span id="topbar-date"></span>
         <button id="btn-prev-top">&#8592; Prev</button>
         <span id="topbar-title">ImSor — Slideshow</span>
         <div id="site-nav">
@@ -872,6 +877,7 @@
             }
         };
         imgEl.src = `/serve/${item.image_id}`;
+        document.getElementById('topbar-date').textContent = item.date_taken?.slice(0, 10) ?? '';
         updateStatus();
         prefetchNext();
         updateAgeDisplay(item);

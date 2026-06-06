@@ -15,6 +15,7 @@
             align-items: center;
         }
         #topbar {
+            position: relative;
             width: 100%;
             display: flex;
             align-items: center;
@@ -28,6 +29,10 @@
         #site-nav { display: flex; gap: 14px; align-items: center; margin-left: 20px; }
         #site-nav a { color: #aaa; text-decoration: none; font-size: 0.9rem; }
         #site-nav a:hover { color: #fff; }
+        #topbar-date {
+            position: absolute; left: 10px;
+            color: #ddd; font-size: 0.9rem; white-space: nowrap; pointer-events: none;
+        }
         #page-content { display: flex; flex-direction: column; align-items: center; padding: 20px; width: 100%; }
 
         #hint {
@@ -228,6 +233,7 @@
         </div>
         <button class="btn-nav" id="btn-next" onclick="navigate(1)">Next &#9654;</button>
         <span id="topbar-status"></span>
+        <span id="topbar-date"></span>
     </div>
 
     <button id="help-btn" onclick="toggleHelp()" title="Help (H)">?</button>
@@ -412,6 +418,8 @@
         updateStatus();
         render();
         updateProgress();
+        const firstDate = clusters[currentIndex]?.images[0]?.date_taken;
+        document.getElementById('topbar-date').textContent = firstDate?.slice(0, 10) ?? '';
     }
 
     function updateStatus() {

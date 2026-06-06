@@ -100,6 +100,10 @@
             transition: right 0.25s ease;
         }
         #topbar.panel-open #status { right: 364px; }
+        #topbar-date {
+            position: absolute; left: 10px;
+            color: #ddd; font-size: 0.9rem; white-space: nowrap; pointer-events: none;
+        }
         #box-mode-indicator {
             position: absolute; left: 10px;
             font-size: 0.75rem; color: #666;
@@ -281,6 +285,7 @@
     <div id="right-side">
 
         <div id="topbar">
+            <span id="topbar-date"></span>
             <button id="btn-prev" onclick="navigate(-1)">&#9664; Prev</button>
             <div id="box-mode-indicator"></div>
             <span id="topbar-title">ImSor — Annotations</span>
@@ -544,6 +549,7 @@
         currentAnnotations = data.annotations;
         rebuildSpatialOrder();
         document.getElementById('filepath').textContent = currentImage.file_path;
+        document.getElementById('topbar-date').textContent = currentImage.date_taken?.slice(0, 10) ?? '';
         updateRotationIndicator();
 
         img.onload = function () { applyRotationLayout(); };
