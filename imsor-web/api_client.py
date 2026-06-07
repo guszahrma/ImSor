@@ -139,7 +139,7 @@ def get_bbox_queue(user_id: int) -> list[dict]:
 def get_bbox_image(image_id: int, user_id: int) -> dict:
     """Return image metadata + user-aware person_bbox annotations for a single image."""
     return _request("GET", f"{config.server_url}/annotations/bbox-image/{image_id}",
-                    params={"user_id": user_id, "active_model": config.active_bbox_model}).json()
+                    params={"user_id": user_id}).json()
 
 
 def get_known_people(user_id: int) -> list[str]:
