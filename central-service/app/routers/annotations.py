@@ -484,9 +484,7 @@ def rating_queue(
         raise HTTPException(status_code=404, detail="User not found")
 
     if user.role == "superuser":
-        images = db.query(Image).filter(
-            Image.date_taken.isnot(None),
-        ).all()
+        images = db.query(Image).all()
     else:
         # Non-superusers see only Nominated images (any slideshow_rating exists)
         nominated_ids = {
@@ -496,10 +494,7 @@ def rating_queue(
         }
         if not nominated_ids:
             return []
-        images = db.query(Image).filter(
-            Image.id.in_(nominated_ids),
-            Image.date_taken.isnot(None),
-        ).all()
+        images = db.query(Image).filter(Image.id.in_(nominated_ids)).all()
 
     # Exclude duplicate copies
     copy_image_ids: set[int] = set()
@@ -646,21 +641,35 @@ def slideshow_queue(
 
     result = []
     for image in images:
-        if image.id in ratings_by_image:
+        if image.id not in ratings_by_image:
+            # Unrated image: only include when min_raters == 0
+            if min_raters > 0:
+                continue
+            result.append({
+                "image_id": image.id,
+                "avg_rating": None,
+                "rating_count": 0,
+                "date_taken": image.date_taken.isoformat() if image.date_taken else None,
+                "public_id":  str(image.public_id),
+                "latitude":   image.gps_latitude,
+                "longitude":  image.gps_longitude,
+            })
+        else:
             if len(raters_by_image.get(image.id, set())) < min_raters:
                 continue
             vals = ratings_by_image[image.id]
             avg = sum(vals) / len(vals) if vals else None
-            if avg is not None and avg >= min_rating:
-                result.append({
-                    "image_id": image.id,
-                    "avg_rating": round(avg, 1),
-                    "rating_count": len(vals),
-                    "date_taken": image.date_taken.isoformat() if image.date_taken else None,
-                    "public_id":  str(image.public_id),
-                    "latitude":   image.gps_latitude,
-                    "longitude":  image.gps_longitude,
-                })
+            if avg is None or avg < min_rating:
+                continue
+            result.append({
+                "image_id": image.id,
+                "avg_rating": round(avg, 1),
+                "rating_count": len(vals),
+                "date_taken": image.date_taken.isoformat() if image.date_taken else None,
+                "public_id":  str(image.public_id),
+                "latitude":   image.gps_latitude,
+                "longitude":  image.gps_longitude,
+            })
 
     # Fetch rotation corrections
     image_ids_in_result = {item["image_id"] for item in result}
