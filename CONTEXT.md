@@ -90,6 +90,9 @@ A user-drawn bounding box for a person the AI did not detect. Stored as an Annot
 ### Person Identification
 A single annotator's assertion, at a point in time, that the person inside a specific Detection Adoption or Supplemental Detection is a known Person (or is unidentifiable). Stored in a dedicated `person_identities` table referencing the Detection Adoption or Supplemental Detection and a nullable Person record. A null `person_id` means the annotator examined the bbox and could not identify the person. The table is append-only — each new assertion is a new row. The latest row per annotator per bbox annotation represents that annotator's current belief.
 
+### Bbox Skip
+A per-user assertion that no bounding box annotation work is needed on a specific image. Stored as an Annotation with `annotation_type = "bbox_skip"`, the user's `user_id`, and `value = "1"`. Images with a Bbox Skip from the requesting user are excluded from their Person Annotation Queue. Does not affect other users' queues or the image's annotations in any other way. Set from the Annotations page with the `N` key.
+
 ### Detection Dismissal
 A user's assertion that a specific Person Detection is not relevant — they do not believe a person is present at that location. Stored in a dedicated `person_bbox_dismissals` table. Dismissal is per-user and does not affect other users' views. A Person Detection is permanently deleted only when it has been dismissed by at least 5 users and no Detection Adoption exists from any user.
 

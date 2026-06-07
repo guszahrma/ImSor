@@ -184,6 +184,17 @@ def bbox_queue(
     if not ai_anns:
         return []
 
+    # Exclude images this user has marked as no bbox annotation needed
+    bbox_skip_ids = {
+        a.image_id for a in db.query(Annotation).filter(
+            Annotation.user_id == user_id,
+            Annotation.annotation_type == "bbox_skip",
+        ).all()
+    }
+    ai_anns = [ann for ann in ai_anns if ann.image_id not in bbox_skip_ids]
+    if not ai_anns:
+        return []
+
     ai_det_ids = {ann.id for ann in ai_anns}
     ai_by_image: dict[int, list[int]] = {}
     for ann in ai_anns:

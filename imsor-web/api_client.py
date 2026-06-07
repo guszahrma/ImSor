@@ -133,7 +133,7 @@ def delete_annotation(annotation_id: int) -> dict:
 def get_bbox_queue(user_id: int) -> list[dict]:
     """Return the bbox annotation queue ordered by the 5-tier annotation priority."""
     return _request("GET", f"{config.server_url}/annotations/bbox-queue",
-                    params={"user_id": user_id, "active_model": config.active_bbox_model}).json()
+                    params={"user_id": user_id}).json()
 
 
 def get_bbox_image(image_id: int, user_id: int) -> dict:

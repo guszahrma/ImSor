@@ -34,8 +34,8 @@ from imsor_utils import extract_exif
 
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
-_YOLO_MODEL_PATH = str(Path(__file__).resolve().parent.parent / "auto-annotator" / "yolov8n.pt")
-_YOLO_SOURCE = "ai:yolov8n"
+_YOLO_MODEL_PATH = str(Path(__file__).resolve().parent.parent / "auto-annotator" / f"{config.active_bbox_model}.pt")
+_YOLO_SOURCE = f"ai:{config.active_bbox_model}"
 _YOLO_CONFIDENCE = 0.5
 _yolo_model = None
 _yolo_lock = threading.Lock()

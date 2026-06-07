@@ -366,6 +366,11 @@
                 <tr><td><kbd>B</kbd></td><td>Cycle boxes: all → selected only → hidden</td></tr>
             </tbody></table>
 
+            <h3>Queue management</h3>
+            <table><tbody>
+                <tr><td><kbd>N</kbd></td><td>No annotation needed — remove image from your queue</td></tr>
+            </tbody></table>
+
             <h3>Naming a person</h3>
             <table><tbody>
                 <tr><td><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></td><td>Assign 1st–10th name from recent list</td></tr>
@@ -1193,6 +1198,29 @@
     // image is auto-removed from the queue on completion.
     let visitHistory = [];
 
+    async function skipBboxAnnotation() {
+        const item = queue[currentIndex];
+        try {
+            await fetch('/api/annotations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    image_id: currentImage.id,
+                    annotation_type: 'bbox_skip',
+                    value: '1',
+                }),
+            });
+        } catch (err) {
+            console.error('Failed to save bbox skip:', err);
+        }
+        pushHistory();
+        completedIds.add(item.image_id);
+        queue.splice(currentIndex, 1);
+        if (queue.length === 0) { showDone(); return; }
+        if (currentIndex >= queue.length) currentIndex--;
+        await showImage(currentIndex);
+    }
+
     function pushHistory() {
         if (!queue[currentIndex]) return;
         visitHistory.push({ imageId: queue[currentIndex].image_id, queueItem: {...queue[currentIndex]} });
@@ -1358,6 +1386,7 @@
             if (helpIsOpen()) { closeHelp(); return; }
             deselectAll(); return;
         }
+        if (e.key === 'n' || e.key === 'N') { if (currentImage) skipBboxAnnotation(); return; }
         if (e.key === 'h' || e.key === 'H') { toggleHelp(); return; }
         if (e.key === 'r' || e.key === 'R') {
             if (currentImage) setRotation(((currentImage.rotation_correction || 0) + 90) % 360);
