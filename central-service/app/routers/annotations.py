@@ -142,8 +142,6 @@ def bbox_queue(
     _current: User = Depends(get_current_user),
 ):
     """Return images with person_bbox detections, ordered by the 5-tier annotation priority."""
-    DATE_CUTOFF = datetime(2007, 11, 8)
-
     # Load AI detections
     ann_query = db.query(Annotation).filter(Annotation.annotation_type == "person_bbox")
     if active_model:
@@ -154,11 +152,9 @@ def bbox_queue(
     if not ai_anns:
         return []
 
-    # Filter by date_taken cutoff; keep date_taken for queue response
     all_image_ids = {ann.image_id for ann in ai_anns}
     eligible_images = db.query(Image).filter(
         Image.id.in_(all_image_ids),
-        Image.date_taken >= DATE_CUTOFF,
     ).all()
     eligible_ids = {img.id for img in eligible_images}
     date_taken_by_image: dict[int, str | None] = {
@@ -480,20 +476,16 @@ def rating_queue(
     _current: User = Depends(get_current_user),
 ):
     """Return images for the rating queue.
-    Superusers see all images with date_taken >= 2007-11-01.
+    Superusers see all images with a date_taken.
     Other users see only Nominated images (images any user has rated).
-    Skipped and duplicate-copy images are excluded.
-    Unrated images come first, both groups randomized."""
+    Duplicate-copy images are excluded."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    DATE_CUTOFF = datetime(2007, 11, 1)
-
     if user.role == "superuser":
         images = db.query(Image).filter(
             Image.date_taken.isnot(None),
-            Image.date_taken >= DATE_CUTOFF,
         ).all()
     else:
         # Non-superusers see only Nominated images (any slideshow_rating exists)
@@ -507,7 +499,6 @@ def rating_queue(
         images = db.query(Image).filter(
             Image.id.in_(nominated_ids),
             Image.date_taken.isnot(None),
-            Image.date_taken >= DATE_CUTOFF,
         ).all()
 
     # Exclude duplicate copies
