@@ -702,14 +702,26 @@ def slideshow_queue(
         bbox_ids = [a.id for a in all_bboxes]
         ann_by_id = {a.id: a for a in all_bboxes}
 
-        # Build {person_id: {image_id: largest identified bbox}} via PersonIdentity
+        # Build {person_id: {image_id: largest identified bbox}} via PersonIdentity.
+        # Only the latest identification per (user_id, bbox_annotation_id) counts —
+        # earlier rows in the append-only table may have been superseded.
         bbox_by_person: dict[int, dict[int, dict]] = {pid: {} for pid in focus_ids}
         if bbox_ids:
-            for pi in db.query(PersonIdentity).filter(
+            all_identities = db.query(PersonIdentity).filter(
                 PersonIdentity.bbox_annotation_id.in_(bbox_ids),
-                PersonIdentity.person_id.in_(focus_ids),
-            ).all():
-                if pi.person_id is None:
+            ).all()
+
+            # Keep only the latest row per (user_id, bbox_annotation_id)
+            latest: dict[tuple, PersonIdentity] = {}
+            for pi in all_identities:
+                if pi.user_id is None:
+                    continue
+                key = (pi.user_id, pi.bbox_annotation_id)
+                if key not in latest or pi.id > latest[key].id:
+                    latest[key] = pi
+
+            for pi in latest.values():
+                if pi.person_id not in focus_ids:
                     continue
                 ann = ann_by_id.get(pi.bbox_annotation_id)
                 if ann is None:
