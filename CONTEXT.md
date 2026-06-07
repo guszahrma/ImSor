@@ -90,6 +90,9 @@ A user-drawn bounding box for a person the AI did not detect. Stored as an Annot
 ### Person Identification
 A single annotator's assertion, at a point in time, that the person inside a specific Detection Adoption or Supplemental Detection is a known Person (or is unidentifiable). Stored in a dedicated `person_identities` table referencing the Detection Adoption or Supplemental Detection and a nullable Person record. A null `person_id` means the annotator examined the bbox and could not identify the person. The table is append-only — each new assertion is a new row. The latest row per annotator per bbox annotation represents that annotator's current belief.
 
+### Image File Event
+A server-side record created each time the `/serve` endpoint attempts to serve an image file that cannot be found on disk. Stored in a dedicated `image_file_events` table. Each failed request produces one row containing the image ID and the timestamp the file was found missing (`detected_at`). When a subsequent `/serve` request for the same image succeeds, all unresolved rows for that image have their `resolved_at` timestamp set. Used to track which files are missing and for how long.
+
 ### Bbox Skip
 A per-user assertion that no bounding box annotation work is needed on a specific image. Stored as an Annotation with `annotation_type = "bbox_skip"`, the user's `user_id`, and `value = "1"`. Images with a Bbox Skip from the requesting user are excluded from their Person Annotation Queue. Does not affect other users' queues or the image's annotations in any other way. Set from the Annotations page with the `N` key.
 

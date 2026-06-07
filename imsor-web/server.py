@@ -546,8 +546,10 @@ def serve_image(image_id: int):
 
     file_path = resolve_path(image["file_path"])
     if not os.path.isfile(file_path):
+        threading.Thread(target=api_client.record_file_missing, args=(image_id,), daemon=True).start()
         abort(404)
 
+    threading.Thread(target=api_client.record_file_resolved, args=(image_id,), daemon=True).start()
     mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     return send_file(file_path, mimetype=mime_type)
 

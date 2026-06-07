@@ -265,6 +265,20 @@ def remove_community_granter(community_id: int, user_id: int) -> dict:
     return _request("DELETE", f"{config.server_url}/communities/{community_id}/granters/{user_id}").json()
 
 
+def record_file_missing(image_id: int) -> None:
+    try:
+        _request("POST", f"{config.server_url}/images/{image_id}/file-events")
+    except Exception:
+        pass
+
+
+def record_file_resolved(image_id: int) -> None:
+    try:
+        _request("PATCH", f"{config.server_url}/images/{image_id}/file-events/resolve")
+    except Exception:
+        pass
+
+
 def set_rotation(image_id: int, degrees: int) -> dict | None:
     """Upsert or clear the rotation_correction annotation for an image."""
     return _request("PUT", f"{config.server_url}/annotations/rotation/{image_id}",

@@ -1,9 +1,11 @@
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Camera, Image, User
+from ..models import Camera, Image, ImageFileEvent, User
 from ..schemas import ImageCreate, ImageOut, ExifOrientationPatch, ImageResponsiblePatch
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -102,6 +104,35 @@ def set_image_responsible(
     db.commit()
     db.refresh(db_image)
     return db_image
+
+
+@router.post("/{image_id}/file-events", status_code=201)
+def record_file_missing(
+    image_id: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(get_current_user),
+):
+    """Record that the file for this image was not found on disk."""
+    event = ImageFileEvent(image_id=image_id)
+    db.add(event)
+    db.commit()
+    return {"detail": "recorded"}
+
+
+@router.patch("/{image_id}/file-events/resolve", status_code=200)
+def resolve_file_events(
+    image_id: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(get_current_user),
+):
+    """Mark all unresolved missing-file events for this image as resolved."""
+    now = datetime.datetime.utcnow()
+    db.query(ImageFileEvent).filter(
+        ImageFileEvent.image_id == image_id,
+        ImageFileEvent.resolved_at.is_(None),
+    ).update({"resolved_at": now})
+    db.commit()
+    return {"detail": "resolved"}
 
 
 @router.get("/{image_id}", response_model=ImageOut)

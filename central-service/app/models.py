@@ -210,6 +210,15 @@ class CameraModelSettings(Base):
     )
 
 
+class ImageFileEvent(Base):
+    __tablename__ = "image_file_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    image_id = Column(Integer, ForeignKey("images.id"), nullable=False, index=True)
+    detected_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+
 class SharingPermission(Base):
     __tablename__ = "sharing_permissions"
 
