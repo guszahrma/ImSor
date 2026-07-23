@@ -755,7 +755,17 @@ def api_upload():
     return jsonify({"session": timestamp, "results": results})
 
 
+def check_mounts():
+    unmounted = [path for path in config.path_mappings.values() if not os.path.ismount(path)]
+    if unmounted:
+        print("[WARNING] Configured mount points are not mounted (images under them will 404):")
+        for path in unmounted:
+            print(f"  - {path}")
+    return unmounted
+
+
 if __name__ == "__main__":
     print(f"ImSor Web running at https://{config.host}:{config.port}")
+    check_mounts()
     # Use HTTPS with self-signed certs for local development
     app.run(host=config.host, port=config.port, debug=False, ssl_context=("cert.pem", "key.pem"))
